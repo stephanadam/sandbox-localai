@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ analysis.title }} &middot; {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>{{ analysis.title }}</h1>
+    <a href="/dashboard" class="btn-link">&larr; Back to dashboard</a>
+</div>
+<p class="muted">
+    {{ analysis_types.get(analysis.analysis_type, analysis.analysis_type) }}
+    &middot; backend <span class="tag">{{ analysis.backend }}</span>
+    &middot; {{ analysis.created_at.strftime("%Y-%m-%d %H:%M") }}
+</p>
+
+<div class="card">
+    <h2>Analysis result</h2>
+    <pre class="result">{{ analysis.result_text }}</pre>
+</div>
+
+<details class="card">
+    <summary>Source document</summary>
+    <pre class="result">{{ analysis.source_text }}</pre>
+</details>
+{% endblock %}
