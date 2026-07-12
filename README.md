@@ -29,7 +29,21 @@ local server and act as the UI layer for a larger local AI system.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
 
+> **Already have a separate environment for your local AI stack** (e.g. Chainlit,
+> CrewAI, LangChain)? Don't install this app into it — the pinned web deps can
+> downgrade packages that stack needs. Use a dedicated venv instead:
+>
+> ```bash
+> python3 -m venv .venv-legal
+> source .venv-legal/bin/activate
+> pip install -r requirements.txt
+> ```
+
+Optionally customize settings, then run the dev server:
+
+```bash
 # Optional: customize settings
 cp .env.example .env
 
