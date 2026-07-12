@@ -33,11 +33,21 @@ pip install -r requirements.txt
 # Optional: customize settings
 cp .env.example .env
 
-# Run the dev server (auto-reload)
+# Run the dev server (auto-reload). Easiest: works from any directory.
+python run.py
+
+# ...or run uvicorn directly (must be from the repo root, with the venv active):
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Then open http://localhost:8000, register an account, and run an analysis.
+
+> If you see `Error loading ASGI app. Attribute "app" not found in module
+> "app.main"`, uvicorn was started from the wrong directory or without the
+> virtualenv active. Use `python run.py` (which pins the working directory), or
+> `cd` to the repo root and activate `.venv` before running `uvicorn`.
+
+Override host/port/reload for `run.py` via env vars, e.g. `PORT=9000 RELOAD=0 python run.py`.
 
 ### Tests
 

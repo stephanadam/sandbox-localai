@@ -16,10 +16,13 @@ the feature list and standard run/test commands.
 - **Virtualenv:** dependencies live in `.venv/` (created by the startup update
   script). Activate with `source .venv/bin/activate` before running commands, or
   call binaries directly via `.venv/bin/...`.
-- **Run the dev server:** `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
-  The SQLite schema is auto-created on startup (FastAPI lifespan → `init_db()`),
-  so there is no separate migration step. The DB file (`legal_analyst.db`) is
-  git-ignored and created on first run.
+- **Run the dev server:** prefer `python run.py` (pins CWD + import path to the
+  repo root, so it works from any directory). Direct `uvicorn app.main:app
+  --reload --port 8000` also works but **only from the repo root with the venv
+  active** — otherwise uvicorn fails with `Error loading ASGI app. Attribute
+  "app" not found in module "app.main"`. The SQLite schema is auto-created on
+  startup (FastAPI lifespan → `init_db()`), so there is no separate migration
+  step. The DB file (`legal_analyst.db`) is git-ignored and created on first run.
 - **Tests:** `pytest -q`. The suite forces `DATABASE_URL` to a throwaway temp
   SQLite file and `AI_BACKEND=mock` via env vars set at import time in
   `tests/test_app.py`, so it never touches the dev database.
