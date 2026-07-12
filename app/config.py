@@ -21,13 +21,13 @@ class Settings(BaseSettings):
 
     anythingllm_url: str = "http://localhost:3001"
     anythingllm_api_key: str = ""
-    anythingllm_workspace: str = "finforge"
+    anythingllm_workspace: str = "acmeco"
 
     # Optional OpenSearch cluster powering document search (status only for now).
     opensearch_url: str = ""
-    opensearch_cluster: str = "finforge-os"
+    opensearch_cluster: str = "acmeco-os"
 
-    app_name: str = "FinForge"
+    app_name: str = "AcmeCO"
     app_tagline: str = "OpenSearch • AnythingLLM"
 
 

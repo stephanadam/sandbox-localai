@@ -7,7 +7,7 @@ import pytest
 # Use an isolated temp DB / upload dir before importing the app.
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _tmp.close()
-_uploads = tempfile.mkdtemp(prefix="finforge_uploads_")
+_uploads = tempfile.mkdtemp(prefix="acmeco_uploads_")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp.name}"
 os.environ["SECRET_KEY"] = "test-secret"
 os.environ["AI_BACKEND"] = "mock"
@@ -41,7 +41,7 @@ def _register(client):
 def test_healthz(client):
     resp = client.get("/healthz")
     assert resp.status_code == 200
-    assert resp.json()["app"] == "FinForge"
+    assert resp.json()["app"] == "AcmeCO"
 
 
 def test_protected_redirects_when_logged_out(client):

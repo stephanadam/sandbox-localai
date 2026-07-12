@@ -2,7 +2,7 @@
 
 ## Project
 
-`sandbox-localai` is **FinForge**, a **local-only** financial/legal document
+`sandbox-localai` is **AcmeCO**, a **local-only** financial/legal document
 workspace: a FastAPI + Jinja2 (dark UI) front end backed by SQLite (SQLAlchemy),
 intended to run on a self-hosted local server as the UI layer for a larger local
 AI system. Core pieces: sign-in, a document library organized into modules
