@@ -1,32 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Dashboard &middot; {{ app_name }}{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="page-head">
-    <h1>Welcome, {{ user.full_name or user.email }}</h1>
-    <a href="/analyze" class="btn">+ New analysis</a>
+<div class="stats-row">
+    <div class="stat-card">
+        <span class="stat-num">{{ total }}</span>
+        <span class="stat-label">Total documents</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">{{ modules|length }}</span>
+        <span class="stat-label">Modules</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">7</span>
+        <span class="stat-label">AI agents</span>
+    </div>
 </div>
 
-{% if analyses %}
-<table class="table">
-    <thead>
-        <tr><th>Title</th><th>Type</th><th>Backend</th><th>Created</th></tr>
-    </thead>
-    <tbody>
-    {% for a in analyses %}
-        <tr>
-            <td><a href="/analysis/{{ a.id }}">{{ a.title }}</a></td>
-            <td>{{ a.analysis_type }}</td>
-            <td><span class="tag">{{ a.backend }}</span></td>
-            <td>{{ a.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-        </tr>
+<h2 class="section-title">Modules</h2>
+<div class="grid">
+    {% for key, label in modules.items() %}
+    <div class="folder-card">
+        <div class="folder-head">
+            <span class="folder-name">📁 {{ label }}</span>
+            <span class="file-badge">{{ grouped[key]|length }} files</span>
+        </div>
+        <a class="folder-open" href="/documents#module-{{ key }}">Open module →</a>
+    </div>
     {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<div class="card empty">
-    <p>No analyses yet.</p>
-    <p class="muted">Paste a contract, filing, or clause and let your local AI system analyze it.</p>
-    <a href="/analyze" class="btn">Run your first analysis</a>
 </div>
-{% endif %}
+
+<div class="cta-row">
+    <a href="/documents" class="btn">Go to Document Library</a>
+</div>
 {% endblock %}

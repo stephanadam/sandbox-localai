@@ -9,12 +9,26 @@ class Settings(BaseSettings):
     secret_key: str = "dev-insecure-secret-change-me"
     database_url: str = "sqlite:///./legal_analyst.db"
 
-    # AI backend: "mock" (built-in heuristic) or "ollama" (local LLM server).
+    # Where uploaded documents are stored on the local server.
+    upload_dir: str = "./uploads"
+
+    # AI backend: "mock" (offline, agent-aware heuristic), "ollama", or
+    # "anythingllm" (RAG assistant). All fall back to mock on error.
     ai_backend: str = "mock"
+
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
 
-    app_name: str = "Legal Analyst"
+    anythingllm_url: str = "http://localhost:3001"
+    anythingllm_api_key: str = ""
+    anythingllm_workspace: str = "finforge"
+
+    # Optional OpenSearch cluster powering document search (status only for now).
+    opensearch_url: str = ""
+    opensearch_cluster: str = "finforge-os"
+
+    app_name: str = "FinForge"
+    app_tagline: str = "OpenSearch • AnythingLLM"
 
 
 settings = Settings()

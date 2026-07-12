@@ -12,5 +12,8 @@ venv/
 *.sqlite3
 .env
 
+# Uploaded documents (local server storage)
+uploads/
+
 # OS
 .DS_Store

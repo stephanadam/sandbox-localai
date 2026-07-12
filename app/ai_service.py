@@ -1,15 +1,15 @@
-"""Interface to the local AI system.
+"""The AI layer: a roster of specialist agents plus the RAG assistant backend.
 
-This module is the single integration point between the web front end and the
-"bigger local AI system". Today it supports two backends:
+The web app talks to the "bigger local AI system" only through ``ask_agent``.
+Backends:
 
-* ``mock``   - a fully local, dependency-free heuristic analysis so the site is
-               usable and testable without any AI service running.
-* ``ollama`` - calls a local Ollama server (a common way to self-host LLMs).
+* ``mock``        - offline, agent-aware heuristic. No external service needed,
+                    so the site is fully usable and testable out of the box.
+* ``ollama``      - local LLM server; each agent gets a role-specific system
+                    prompt (mirrors the CrewAI agent roster).
+* ``anythingllm`` - AnythingLLM workspace chat endpoint (RAG over OpenSearch).
 
-Add new local backends (llama.cpp, vLLM, a custom service, ...) by extending
-``analyze`` with another branch. The rest of the app only depends on the
-``AnalysisResult`` returned here.
+Every backend falls back to ``mock`` on error so the assistant always responds.
 """
 
 from __future__ import annotations
@@ -21,117 +21,213 @@ import httpx
 
 from app.config import settings
 
-ANALYSIS_TYPES = {
-    "summary": "Plain-language summary",
-    "risks": "Risk & liability spotting",
-    "clauses": "Key clause extraction",
-    "obligations": "Obligations & deadlines",
+# Modules shown in the sidebar / used as document categories.
+MODULES: dict[str, str] = {
+    "alternative_finance": "Alternative Finance",
+    "specialty_lending": "Specialty Lending",
+    "acquisitions": "Acquisitions",
+    "legal_funding": "Legal Funding",
+    "portfolio_management": "Portfolio Management",
 }
 
-_PROMPTS = {
-    "summary": "Summarize the following legal document in plain language for a client:",
-    "risks": "Identify the key legal risks and liabilities in the following document:",
-    "clauses": "Extract and list the key clauses from the following legal document:",
-    "obligations": "List the obligations, deadlines, and responsibilities in this document:",
+# Specialist agents (mirrors the CrewAI roster the local AI system runs).
+AGENTS: dict[str, dict[str, str]] = {
+    "finance": {
+        "role": "Finance Specialist",
+        "goal": "Financial analysis and projections",
+        "backstory": "Expert in corporate finance",
+        "icon": "📊",
+    },
+    "capital_markets": {
+        "role": "Capital Markets Expert",
+        "goal": "Market and funding analysis",
+        "backstory": "Specialist in equity and debt",
+        "icon": "📈",
+    },
+    "underwriting_risk": {
+        "role": "Underwriting & Risk Manager",
+        "goal": "Risk assessment",
+        "backstory": "Experienced in risk",
+        "icon": "🛡️",
+    },
+    "legal": {
+        "role": "Legal Advisor",
+        "goal": "Legal compliance",
+        "backstory": "Corporate legal expert",
+        "icon": "⚖️",
+    },
+    "accounting": {
+        "role": "Accounting Specialist",
+        "goal": "Accounting and reporting",
+        "backstory": "CPA-level expert",
+        "icon": "🧾",
+    },
+    "marketing": {
+        "role": "Marketing Strategist",
+        "goal": "Marketing and growth",
+        "backstory": "Digital marketing expert",
+        "icon": "📣",
+    },
+    "data_analytics": {
+        "role": "Data Analytics Expert",
+        "goal": "Data insights",
+        "backstory": "Data scientist",
+        "icon": "🔬",
+    },
 }
+
+DEFAULT_AGENT = "finance"
 
 
 @dataclass
-class AnalysisResult:
-    result_text: str
+class AgentReply:
+    text: str
     backend: str
+    agent_key: str
 
 
-def analyze(text: str, analysis_type: str = "summary") -> AnalysisResult:
-    if analysis_type not in ANALYSIS_TYPES:
-        analysis_type = "summary"
+def agent_or_default(agent_key: str) -> str:
+    return agent_key if agent_key in AGENTS else DEFAULT_AGENT
+
+
+def _system_prompt(agent_key: str) -> str:
+    a = AGENTS[agent_key]
+    return (
+        f"You are a {a['role']}. {a['backstory']}. "
+        f"Your goal: {a['goal']}. Answer concisely and professionally."
+    )
+
+
+def ask_agent(
+    agent_key: str, question: str, context_text: str | None = None
+) -> AgentReply:
+    agent_key = agent_or_default(agent_key)
 
     if settings.ai_backend == "ollama":
         try:
-            return _analyze_with_ollama(text, analysis_type)
-        except Exception as exc:  # noqa: BLE001 - fall back gracefully
-            fallback = _analyze_with_mock(text, analysis_type)
-            fallback.result_text = (
-                f"[Ollama backend unavailable: {exc}. Showing local heuristic "
-                f"analysis instead.]\n\n{fallback.result_text}"
-            )
-            return fallback
+            return _ask_ollama(agent_key, question, context_text)
+        except Exception as exc:  # noqa: BLE001
+            return _degrade(agent_key, question, context_text, "ollama", exc)
+    if settings.ai_backend == "anythingllm":
+        try:
+            return _ask_anythingllm(agent_key, question, context_text)
+        except Exception as exc:  # noqa: BLE001
+            return _degrade(agent_key, question, context_text, "anythingllm", exc)
 
-    return _analyze_with_mock(text, analysis_type)
+    return _ask_mock(agent_key, question, context_text)
 
 
-def _analyze_with_ollama(text: str, analysis_type: str) -> AnalysisResult:
-    prompt = f"{_PROMPTS[analysis_type]}\n\n{text}"
+def _degrade(agent_key, question, context_text, backend, exc) -> AgentReply:
+    reply = _ask_mock(agent_key, question, context_text)
+    reply.text = (
+        f"[{backend} backend unavailable: {exc}. Showing offline agent "
+        f"response instead.]\n\n{reply.text}"
+    )
+    return reply
+
+
+def _ask_ollama(agent_key, question, context_text) -> AgentReply:
+    prompt = question
+    if context_text:
+        prompt = f"Using this document as context:\n\n{context_text}\n\n{question}"
     response = httpx.post(
         f"{settings.ollama_url}/api/generate",
-        json={"model": settings.ollama_model, "prompt": prompt, "stream": False},
+        json={
+            "model": settings.ollama_model,
+            "system": _system_prompt(agent_key),
+            "prompt": prompt,
+            "stream": False,
+        },
         timeout=120,
     )
     response.raise_for_status()
+    return AgentReply(
+        text=response.json().get("response", "").strip(),
+        backend="ollama",
+        agent_key=agent_key,
+    )
+
+
+def _ask_anythingllm(agent_key, question, context_text) -> AgentReply:
+    message = f"[As {AGENTS[agent_key]['role']}] {question}"
+    if context_text:
+        message += f"\n\nDocument context:\n{context_text}"
+    headers = {"Content-Type": "application/json"}
+    if settings.anythingllm_api_key:
+        headers["Authorization"] = f"Bearer {settings.anythingllm_api_key}"
+    url = (
+        f"{settings.anythingllm_url}/api/v1/workspace/"
+        f"{settings.anythingllm_workspace}/chat"
+    )
+    response = httpx.post(
+        url, json={"message": message, "mode": "query"}, headers=headers, timeout=120
+    )
+    response.raise_for_status()
     data = response.json()
-    return AnalysisResult(
-        result_text=data.get("response", "").strip(), backend="ollama"
-    )
+    text = data.get("textResponse") or data.get("response") or str(data)
+    return AgentReply(text=text.strip(), backend="anythingllm", agent_key=agent_key)
 
 
-def _analyze_with_mock(text: str, analysis_type: str) -> AnalysisResult:
-    """Deterministic, offline analysis so the app works with no AI service.
+def _ask_mock(agent_key, question, context_text) -> AgentReply:
+    """Deterministic, role-aware offline reply so the assistant always works."""
+    agent = AGENTS[agent_key]
+    lines = [f"{agent['icon']} {agent['role']} — {agent['goal']}", ""]
 
-    This is intentionally simple: it demonstrates the end-to-end flow and gives
-    reviewers something meaningful to look at until a real model is wired in.
-    """
-    words = re.findall(r"\b\w+\b", text)
-    word_count = len(words)
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    lines.append(f'You asked: "{question.strip()}"')
+    lines.append("")
 
-    legal_terms = [
-        "agreement", "liability", "indemnify", "indemnification", "terminate",
-        "termination", "confidential", "warranty", "breach", "governing law",
-        "jurisdiction", "damages", "obligation", "party", "parties", "clause",
-        "deadline", "notice", "payment", "arbitration", "dispute",
-    ]
-    lowered = text.lower()
-    found = sorted({t for t in legal_terms if t in lowered})
-
-    header = f"[Local heuristic analysis - {ANALYSIS_TYPES[analysis_type]}]"
-    stats = (
-        f"Document length: {word_count} words, {len(sentences)} sentences.\n"
-        f"Detected legal terms: {', '.join(found) if found else 'none detected'}."
-    )
-
-    if analysis_type == "summary":
-        preview = " ".join(sentences[:3]) if sentences else text[:400]
-        body = f"Opening of document:\n{preview}"
-    elif analysis_type == "risks":
-        risk_terms = [t for t in found if t in {
-            "liability", "indemnify", "indemnification", "breach", "damages",
-            "termination", "terminate", "dispute", "arbitration",
-        }]
-        body = (
-            "Potential risk areas flagged based on detected terms:\n- "
-            + "\n- ".join(risk_terms)
-            if risk_terms
-            else "No high-signal risk terms detected in this document."
-        )
-    elif analysis_type == "clauses":
-        clause_lines = [s for s in sentences if any(t in s.lower() for t in found)]
-        body = (
-            "Sentences referencing key legal terms:\n- "
-            + "\n- ".join(clause_lines[:8])
-            if clause_lines
-            else "No clause-like sentences detected."
-        )
-    else:  # obligations
-        obligation_lines = [
-            s for s in sentences
-            if re.search(r"\b(shall|must|will|agree|required|responsible)\b", s, re.I)
+    if context_text:
+        words = re.findall(r"\b\w+\b", context_text)
+        sentences = [
+            s.strip() for s in re.split(r"(?<=[.!?])\s+", context_text) if s.strip()
         ]
-        body = (
-            "Sentences expressing obligations:\n- "
-            + "\n- ".join(obligation_lines[:8])
-            if obligation_lines
-            else "No explicit obligation language detected."
+        terms = _detect_terms(context_text)
+        lines.append(
+            f"Reviewed the attached document ({len(words)} words, "
+            f"{len(sentences)} sentences)."
+        )
+        if terms:
+            lines.append(f"Key terms detected: {', '.join(terms)}.")
+        focus = _AGENT_FOCUS.get(agent_key, [])
+        hits = [t for t in terms if t in focus]
+        if hits:
+            lines.append(
+                f"From a {agent['role']} perspective, note especially: "
+                f"{', '.join(hits)}."
+            )
+        if sentences:
+            lines.append("")
+            lines.append("Relevant excerpt:")
+            lines.append(f"“{sentences[0]}”")
+    else:
+        lines.append(
+            f"As a {agent['role']} ({agent['backstory']}), here is my initial take. "
+            "Attach a document for a grounded, RAG-based answer."
         )
 
-    result = f"{header}\n\n{stats}\n\n{body}"
-    return AnalysisResult(result_text=result, backend="mock")
+    lines.append("")
+    lines.append(
+        "[Offline agent response — connect Ollama or AnythingLLM for full RAG.]"
+    )
+    return AgentReply(text="\n".join(lines), backend="mock", agent_key=agent_key)
+
+
+_AGENT_FOCUS: dict[str, list[str]] = {
+    "finance": ["revenue", "yield", "return", "cash", "valuation", "ebitda"],
+    "capital_markets": ["equity", "debt", "funding", "market", "bond", "credit"],
+    "underwriting_risk": ["risk", "liability", "default", "collateral", "breach"],
+    "legal": ["agreement", "liability", "indemnify", "compliance", "clause", "breach"],
+    "accounting": ["revenue", "expense", "reporting", "audit", "tax", "gaap"],
+    "marketing": ["growth", "customer", "brand", "acquisition", "channel"],
+    "data_analytics": ["data", "model", "metric", "trend", "forecast", "insight"],
+}
+
+_TERMS = sorted({t for terms in _AGENT_FOCUS.values() for t in terms} | {
+    "portfolio", "underwriting", "financing", "arbitration", "dispute", "damages",
+    "settlement", "roi", "irr", "diversification",
+})
+
+
+def _detect_terms(text: str) -> list[str]:
+    lowered = text.lower()
+    return [t for t in _TERMS if t in lowered]

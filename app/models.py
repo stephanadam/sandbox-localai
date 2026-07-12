@@ -19,23 +19,47 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
-    analyses: Mapped[list["Analysis"]] = relationship(
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
 
-class Analysis(Base):
-    """A legal analysis produced by the local AI system for a user."""
+class Document(Base):
+    """A document uploaded into a module (category) and available to the AI."""
 
-    __tablename__ = "analyses"
+    __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    title: Mapped[str] = mapped_column(String(255), default="Untitled document")
-    analysis_type: Mapped[str] = mapped_column(String(64), default="summary")
-    source_text: Mapped[str] = mapped_column(Text)
-    result_text: Mapped[str] = mapped_column(Text)
+    module: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    original_name: Mapped[str] = mapped_column(String(255), default="")
+    stored_path: Mapped[str] = mapped_column(String(512), default="")
+    content_type: Mapped[str] = mapped_column(String(128), default="")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    extracted_text: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="documents")
+
+
+class ChatMessage(Base):
+    """A message in the RAG assistant conversation (per user, per agent)."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), default="finance")
+    sender: Mapped[str] = mapped_column(String(16), default="user")  # user|assistant
+    content: Mapped[str] = mapped_column(Text)
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id"), nullable=True
+    )
     backend: Mapped[str] = mapped_column(String(32), default="mock")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="analyses")
+    user: Mapped["User"] = relationship(back_populates="messages")

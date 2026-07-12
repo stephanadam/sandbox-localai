@@ -1,12 +1,12 @@
-{% extends "base.html" %}
-{% block title %}Register &middot; {{ app_name }}{% endblock %}
+{% extends "auth_base.html" %}
+{% block title %}Register · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="card auth-card">
     <h1>Create your account</h1>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="post" action="/register">
         <label>Full name
-            <input type="text" name="full_name" placeholder="Jane Analyst">
+            <input type="text" name="full_name" placeholder="Stephan Adam">
         </label>
         <label>Email
             <input type="email" name="email" required>
@@ -14,7 +14,7 @@
         <label>Password
             <input type="password" name="password" required minlength="6">
         </label>
-        <button type="submit" class="btn">Register</button>
+        <button type="submit" class="btn btn-block">Register</button>
     </form>
     <p class="muted">Already have an account? <a href="/login">Sign in</a>.</p>
 </div>
