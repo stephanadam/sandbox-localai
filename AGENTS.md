@@ -37,6 +37,15 @@ feature list and standard run/test commands.
   `AI_BACKEND=anythingllm` (+ `ANYTHINGLLM_URL`/`ANYTHINGLLM_API_KEY`/
   `ANYTHINGLLM_WORKSPACE`) to use a real LLM; both **fall back to `mock`** on any
   error, so a missing/broken AI service never breaks the UI.
+- **Audit log:** all auth events, uploads, and every assistant question/response
+  are written to `<LOG_DIR>/acmeco.log` (default `./logs/`, git-ignored, rotating)
+  via `app/audit.py` `log_event()`; it also mirrors to stdout. `LOG_DIR` is
+  configurable.
+- **Assistant panel size** is a per-user preference (`users.assistant_width/height`)
+  saved by the CSS resize handle via `POST /assistant/preferences` and reapplied
+  on load. New nullable columns are added to existing SQLite DBs by an additive
+  migration in `database.py` `_migrate_sqlite()` (runs inside `init_db`), so
+  older local databases keep working without a manual migration.
 - **Uploads:** stored under `UPLOAD_DIR` (default `./uploads/`, git-ignored);
   extracted text is saved on the `Document` row and passed to the agent as RAG
   context. PDF/DOCX/XLSX parsing needs `pypdf`/`python-docx`/`openpyxl` (in
