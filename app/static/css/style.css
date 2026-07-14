@@ -163,7 +163,7 @@ body.app { display: flex; min-height: 100vh; }
 .cta-row { margin-top: 1.4rem; }
 
 /* ---------- Library layout with assistant ---------- */
-.library-layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.2rem; align-items: start; }
+.library-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: start; }
 .library-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 
 .upload-card { display: none; }
@@ -175,9 +175,15 @@ body.app { display: flex; min-height: 100vh; }
     background: #0f1413; border: 1px solid var(--border);
     border-radius: 14px; padding: 1rem;
     position: sticky; top: 1rem;
-    display: flex; flex-direction: column; max-height: calc(100vh - 6rem);
+    display: flex; flex-direction: column;
+    /* Enlarged default size, and user-resizable (persisted per profile). */
+    width: 440px; height: 620px;
+    min-width: 320px; min-height: 360px;
+    max-width: 1200px; max-height: 2000px;
+    resize: both; overflow: auto;
 }
 .assistant-head { display: flex; align-items: center; justify-content: space-between; }
+.resize-hint { color: #55635e; font-size: 0.66rem; margin: 0.15rem 0 0.4rem; }
 .badge-backend {
     background: var(--panel-2); color: var(--accent);
     border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.68rem;
@@ -185,7 +191,7 @@ body.app { display: flex; min-height: 100vh; }
 }
 .assistant-hint { color: var(--muted); font-size: 0.78rem; font-style: italic; margin: 0.4rem 0 0.8rem; }
 .chat-log {
-    flex: 1; overflow-y: auto; min-height: 160px;
+    flex: 1; overflow-y: auto; min-height: 220px;
     display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.8rem;
 }
 .bubble {
@@ -237,5 +243,5 @@ body.auth { display: flex; align-items: center; justify-content: center; min-hei
 
 @media (max-width: 900px) {
     .library-layout { grid-template-columns: 1fr; }
-    .assistant { position: static; max-height: none; }
+    .assistant { position: static; width: 100%; height: auto; resize: vertical; }
 }

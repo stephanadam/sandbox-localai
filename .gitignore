@@ -15,5 +15,8 @@ venv/
 # Uploaded documents (local server storage)
 uploads/
 
+# Audit / transaction logs
+logs/
+
 # OS
 .DS_Store

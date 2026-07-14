@@ -99,7 +99,10 @@ def _system_prompt(agent_key: str) -> str:
 
 
 def ask_agent(
-    agent_key: str, question: str, context_text: str | None = None
+    agent_key: str,
+    question: str,
+    context_text: str | None = None,
+    document_title: str | None = None,
 ) -> AgentReply:
     agent_key = agent_or_default(agent_key)
 
@@ -107,18 +110,24 @@ def ask_agent(
         try:
             return _ask_ollama(agent_key, question, context_text)
         except Exception as exc:  # noqa: BLE001
-            return _degrade(agent_key, question, context_text, "ollama", exc)
+            return _degrade(
+                agent_key, question, context_text, document_title, "ollama", exc
+            )
     if settings.ai_backend == "anythingllm":
         try:
             return _ask_anythingllm(agent_key, question, context_text)
         except Exception as exc:  # noqa: BLE001
-            return _degrade(agent_key, question, context_text, "anythingllm", exc)
+            return _degrade(
+                agent_key, question, context_text, document_title, "anythingllm", exc
+            )
 
-    return _ask_mock(agent_key, question, context_text)
+    return _ask_mock(agent_key, question, context_text, document_title)
 
 
-def _degrade(agent_key, question, context_text, backend, exc) -> AgentReply:
-    reply = _ask_mock(agent_key, question, context_text)
+def _degrade(
+    agent_key, question, context_text, document_title, backend, exc
+) -> AgentReply:
+    reply = _ask_mock(agent_key, question, context_text, document_title)
     reply.text = (
         f"[{backend} backend unavailable: {exc}. Showing offline agent "
         f"response instead.]\n\n{reply.text}"
@@ -168,13 +177,27 @@ def _ask_anythingllm(agent_key, question, context_text) -> AgentReply:
     return AgentReply(text=text.strip(), backend="anythingllm", agent_key=agent_key)
 
 
-def _ask_mock(agent_key, question, context_text) -> AgentReply:
+def _ask_mock(agent_key, question, context_text, document_title=None) -> AgentReply:
     """Deterministic, role-aware offline reply so the assistant always works."""
     agent = AGENTS[agent_key]
     lines = [f"{agent['icon']} {agent['role']} — {agent['goal']}", ""]
 
     lines.append(f'You asked: "{question.strip()}"')
     lines.append("")
+
+    if not context_text and document_title:
+        # A document was attached but no usable text could be read from it.
+        lines.append(
+            f'The attached document "{document_title}" has no extractable text '
+            "(it may be a scanned/image PDF or an unsupported format), so I "
+            "answered from general expertise. Upload a text-based version for a "
+            "document-grounded answer."
+        )
+        lines.append("")
+        lines.append(
+            f"[Offline agent response — connect Ollama or AnythingLLM for full RAG.]"
+        )
+        return AgentReply(text="\n".join(lines), backend="mock", agent_key=agent_key)
 
     if context_text:
         words = re.findall(r"\b\w+\b", context_text)

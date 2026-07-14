@@ -56,11 +56,13 @@
         </div>
     </section>
 
-    <aside class="assistant" id="assistant">
+    <aside class="assistant" id="assistant"
+           {% if assistant_width or assistant_height %}style="{% if assistant_width %}width:{{ assistant_width }}px;{% endif %}{% if assistant_height %}height:{{ assistant_height }}px;{% endif %}"{% endif %}>
         <div class="assistant-head">
             <strong>Assistant (RAG)</strong>
             <span class="badge-backend">{{ ai_backend }}</span>
         </div>
+        <p class="resize-hint">Drag the bottom-right corner to resize · saved to your profile</p>
         <p class="assistant-hint">Connected. Ask any specialist agent about your documents.</p>
 
         <div class="chat-log">
@@ -94,9 +96,10 @@
                     {% endfor %}
                 </select>
             </label>
-            <textarea name="question" rows="2" placeholder="Ask about documents..." required></textarea>
+            <textarea name="question" rows="3" placeholder="Ask about documents..." required></textarea>
             <button type="submit" class="btn btn-block">Send to Assistant</button>
         </form>
     </aside>
 </div>
+<script src="/static/js/assistant.js"></script>
 {% endblock %}

@@ -19,6 +19,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
+    # Per-user UI preference: size of the assistant chat panel (pixels).
+    assistant_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    assistant_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     documents: Mapped[list["Document"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )

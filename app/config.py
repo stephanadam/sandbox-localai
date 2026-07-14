@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Where uploaded documents are stored on the local server.
     upload_dir: str = "./uploads"
 
+    # Directory for the rotating audit log of transactions & AI responses.
+    log_dir: str = "./logs"
+
     # AI backend: "mock" (offline, agent-aware heuristic), "ollama", or
     # "anythingllm" (RAG assistant). All fall back to mock on error.
     ai_backend: str = "mock"

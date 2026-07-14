@@ -20,6 +20,9 @@ from app.templating import TEMPLATES_DIR, templates
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    from app.audit import log_event
+
+    log_event("app.startup", app=settings.app_name, ai_backend=settings.ai_backend)
     yield
 
 

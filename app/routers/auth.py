@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit import log_event
 from app.auth import hash_password, login_user, logout_user, verify_password
 from app.database import get_db
 from app.models import User
@@ -32,6 +33,7 @@ def register(
         error = "An account with that email already exists."
 
     if error:
+        log_event("register.failed", email=email, reason=error)
         return templates.TemplateResponse(
             request, "register.html", {"error": error}, status_code=400
         )
@@ -45,6 +47,7 @@ def register(
     db.commit()
     db.refresh(user)
     login_user(request, user)
+    log_event("register.success", user=email)
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
@@ -63,6 +66,7 @@ def login(
     email = email.strip().lower()
     user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(password, user.password_hash):
+        log_event("login.failed", email=email)
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -70,10 +74,13 @@ def login(
             status_code=401,
         )
     login_user(request, user)
+    log_event("login.success", user=email)
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
 @router.get("/logout")
 def logout(request: Request):
+    user_id = request.session.get("user_id")
     logout_user(request)
+    log_event("logout", user_id=user_id)
     return RedirectResponse(url="/login", status_code=303)

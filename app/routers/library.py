@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai_service import AGENTS, DEFAULT_AGENT, MODULES
+from app.audit import log_event
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
@@ -85,6 +86,8 @@ def documents(
             "messages": messages,
             "documents_flat": [d for docs in grouped.values() for d in docs],
             "q": q,
+            "assistant_width": user.assistant_width,
+            "assistant_height": user.assistant_height,
         },
     )
 
@@ -123,4 +126,13 @@ async def upload_document(
     )
     db.add(doc)
     db.commit()
+    log_event(
+        "document.upload",
+        user=user.email,
+        module=module,
+        title=doc.title,
+        filename=doc.original_name,
+        size_bytes=doc.size_bytes,
+        extracted_chars=len(text),
+    )
     return RedirectResponse(url="/documents", status_code=303)
