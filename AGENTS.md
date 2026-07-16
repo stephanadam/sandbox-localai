@@ -5,12 +5,20 @@
 `sandbox-localai` is **AcmeCO**, a **local-only** financial/legal document
 workspace: a FastAPI + Jinja2 (dark UI) front end backed by SQLite (SQLAlchemy),
 intended to run on a self-hosted local server as the UI layer for a larger local
-AI system. Core pieces: sign-in, a single-folder document library (text-file
-upload), document text extraction (`app/extract.py`), and a RAG assistant that
-routes questions to one of seven specialist agents (`app/ai_service.py` →
-`AGENTS`). Conversations are **per file**: each uploaded file has its own saved
-query/response history (`ChatMessage.document_id`), viewable by selecting that
-file (`/documents?doc=<id>`). See `README.md` for run/test commands.
+AI system. Three menus: **Dashboard** (stats: files uploaded / AI agents / files
+analyzed), **Documents** (`/documents`: upload, view, delete; lists both uploaded
+files and saved analyses — no chat here), and **Chat** (`/chat`: pick an agent +
+a "file to process", ask). Core pieces: sign-in, text extraction
+(`app/extract.py`), and a RAG assistant over seven specialist agents
+(`app/ai_service.py` → `AGENTS`). Conversations are **per file**
+(`ChatMessage.document_id`), viewable at `/chat?doc=<id>`. See `README.md` for
+run/test commands.
+
+- **Analysis files:** every AI chat response is also written to a `.txt` file in
+  `UPLOAD_DIR` and recorded as a `Document` with `kind="analysis"`, so it shows
+  up in Documents (tagged "Analysis") and can be reopened later. Uploads have
+  `kind="upload"`. The `kind` column is added to older SQLite DBs by the additive
+  migration in `database.py` `_migrate_sqlite()`.
 
 ## Cursor Cloud specific instructions
 
