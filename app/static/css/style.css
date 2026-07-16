@@ -177,14 +177,27 @@ body.app { display: flex; min-height: 100vh; }
 
 .file-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .file-item {
-    display: flex; align-items: center; gap: 0.6rem;
-    padding: 0.65rem 0.7rem; border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.5rem 0.6rem; border: 1px solid var(--border);
     border-radius: 10px; background: var(--panel);
 }
 .file-item:hover { border-color: var(--accent-dark); }
 .file-item.selected { border-color: var(--accent); background: var(--panel-2); }
-.file-item .doc-meta strong { font-size: 0.86rem; }
+.file-open { display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; }
+.file-item .doc-meta { min-width: 0; }
+.file-item .doc-meta strong {
+    font-size: 0.86rem; display: block;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .file-item .doc-meta small { color: var(--muted); font-size: 0.72rem; }
+.file-del {
+    background: transparent; border: none; cursor: pointer;
+    font-size: 0.95rem; padding: 0.25rem 0.35rem; border-radius: 6px;
+    opacity: 0.6; line-height: 1;
+}
+.file-del:hover { opacity: 1; background: rgba(248,113,113,0.15); }
+
+.chat-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 
 /* ---------- Assistant panel (fixed, large) ---------- */
 .assistant {

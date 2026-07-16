@@ -189,6 +189,58 @@ def test_attached_document_with_no_text_message(client):
     assert "no extractable text" in resp.text
 
 
+def test_chat_form_has_document_picker(client):
+    _register(client)
+    doc_id = _upload(client, "Picker Memo", content=b"content for picker test")
+    page = client.get(f"/documents?doc={doc_id}").text
+    assert 'name="document_id"' in page
+    assert "Picker Memo" in page
+
+
+def test_delete_document_removes_file_and_conversation(client):
+    _register(client)
+    doc_id = _upload(client, "Disposable Memo", content=b"temporary content revenue")
+
+    # Create a conversation for it.
+    client.post(
+        "/assistant/ask",
+        data={"question": "anything?", "agent_key": "finance",
+              "document_id": str(doc_id)},
+        follow_redirects=True,
+    )
+
+    from sqlalchemy import func, select
+
+    from app.database import SessionLocal
+    from app.models import ChatMessage, Document
+
+    with SessionLocal() as db:
+        assert db.get(Document, doc_id) is not None
+        msg_count = db.scalar(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.document_id == doc_id
+            )
+        )
+        assert msg_count and msg_count > 0
+
+    # Delete it.
+    resp = client.post(f"/documents/{doc_id}/delete", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/documents"
+
+    with SessionLocal() as db:
+        assert db.get(Document, doc_id) is None
+        remaining = db.scalar(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.document_id == doc_id
+            )
+        )
+        assert remaining == 0
+
+    # It no longer appears in the library.
+    assert "Disposable Memo" not in client.get("/documents").text
+
+
 def test_audit_log_written(client):
     _register(client)
     log_path = os.path.join(_logs, "acmeco.log")

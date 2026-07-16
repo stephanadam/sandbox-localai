@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.ai_service import AGENTS, DEFAULT_AGENT
@@ -145,3 +145,35 @@ async def upload_document(
     )
     # Open the freshly uploaded file's conversation.
     return RedirectResponse(url=f"/documents?doc={doc.id}", status_code=303)
+
+
+@router.post("/documents/{doc_id}/delete")
+def delete_document(
+    doc_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    if (r := _require(user)):
+        return r
+
+    doc = db.get(Document, doc_id)
+    if doc is None or doc.user_id != user.id:
+        return RedirectResponse(url="/documents", status_code=303)
+
+    # Remove the file's conversation, the stored file on disk, then the record.
+    db.execute(
+        delete(ChatMessage).where(
+            ChatMessage.document_id == doc.id, ChatMessage.user_id == user.id
+        )
+    )
+    if doc.stored_path and os.path.exists(doc.stored_path):
+        try:
+            os.remove(doc.stored_path)
+        except OSError:
+            pass
+    title = doc.title
+    db.delete(doc)
+    db.commit()
+    log_event("document.delete", user=user.email, title=title, document_id=doc_id)
+    return RedirectResponse(url="/documents", status_code=303)

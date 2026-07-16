@@ -27,14 +27,19 @@
                 <p class="muted empty-note">No files yet. Upload one to start a conversation.</p>
             {% endif %}
             {% for doc in files %}
-            <a class="file-item {% if active and doc.id == active.id %}selected{% endif %}"
-               href="/documents?doc={{ doc.id }}#assistant">
-                <span class="doc-icon">📄</span>
-                <span class="doc-meta">
-                    <strong>{{ doc.title }}</strong>
-                    <small>{{ (doc.size_bytes / 1024)|round(1) }} KB</small>
-                </span>
-            </a>
+            <div class="file-item {% if active and doc.id == active.id %}selected{% endif %}">
+                <a class="file-open" href="/documents?doc={{ doc.id }}#assistant">
+                    <span class="doc-icon">📄</span>
+                    <span class="doc-meta">
+                        <strong>{{ doc.title }}</strong>
+                        <small>{{ (doc.size_bytes / 1024)|round(1) }} KB</small>
+                    </span>
+                </a>
+                <form method="post" action="/documents/{{ doc.id }}/delete"
+                      onsubmit="return confirm('Delete “{{ doc.title }}” and its conversation?');">
+                    <button type="submit" class="file-del" title="Remove file">🗑</button>
+                </form>
+            </div>
             {% endfor %}
         </div>
     </section>
@@ -69,17 +74,27 @@
             </div>
 
             <form class="chat-form" method="post" action="/assistant/ask">
-                <input type="hidden" name="document_id" value="{{ active.id }}">
-                <label class="sr-label">Agent
-                    <select name="agent_key">
-                        {% for key, a in agents.items() %}
-                            <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
-                                {{ a.icon }} {{ a.role }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <textarea name="question" rows="3" placeholder="Ask about this file..." required></textarea>
+                <div class="chat-selects">
+                    <label class="sr-label">Agent
+                        <select name="agent_key">
+                            {% for key, a in agents.items() %}
+                                <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
+                                    {{ a.icon }} {{ a.role }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="sr-label">Document to send
+                        <select name="document_id">
+                            {% for doc in files %}
+                                <option value="{{ doc.id }}" {% if active and doc.id == active.id %}selected{% endif %}>
+                                    {{ doc.title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <textarea name="question" rows="3" placeholder="Ask about the selected document..." required></textarea>
                 <button type="submit" class="btn btn-block">Send to Assistant</button>
             </form>
         {% endif %}
