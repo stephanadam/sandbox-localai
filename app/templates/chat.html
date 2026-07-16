@@ -72,7 +72,13 @@
                         </select>
                     </label>
                 </div>
-                <textarea name="question" rows="3" placeholder="Task the AI about the selected file..." required></textarea>
+                <textarea id="question-box" name="question" rows="3" placeholder="Task the AI about the selected file..." required></textarea>
+                <div class="starter-prompts">
+                    <span class="starter-label">Try:</span>
+                    {% for p in starter_prompts %}
+                        <button type="button" class="chip" data-prompt="{{ p }}">{{ p }}</button>
+                    {% endfor %}
+                </div>
                 <button type="submit" class="btn btn-block">Send to Assistant</button>
             </form>
         {% endif %}

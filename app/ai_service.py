@@ -28,46 +28,70 @@ AGENTS: dict[str, dict[str, str]] = {
         "goal": "Financial analysis and projections",
         "backstory": "Expert in corporate finance",
         "icon": "📊",
+        "capabilities": "Financial projections, statement analysis, "
+        "ROI/IRR & yield calculations, valuation and cash-flow modelling.",
     },
     "capital_markets": {
         "role": "Capital Markets Expert",
         "goal": "Market and funding analysis",
         "backstory": "Specialist in equity and debt",
         "icon": "📈",
+        "capabilities": "Funding structure (debt vs equity), pricing and "
+        "covenants, market comparables and investor positioning.",
     },
     "underwriting_risk": {
         "role": "Underwriting & Risk Manager",
         "goal": "Risk assessment",
         "backstory": "Experienced in risk",
         "icon": "🛡️",
+        "capabilities": "Risk identification, creditworthiness, collateral and "
+        "default analysis, stress tests and mitigation.",
     },
     "legal": {
         "role": "Legal Advisor",
         "goal": "Legal compliance",
         "backstory": "Corporate legal expert",
         "icon": "⚖️",
+        "capabilities": "Contract review, clause & obligation extraction, "
+        "compliance flags, indemnity and dispute considerations.",
     },
     "accounting": {
         "role": "Accounting Specialist",
         "goal": "Accounting and reporting",
         "backstory": "CPA-level expert",
         "icon": "🧾",
+        "capabilities": "Revenue recognition, financial reporting, tax treatment "
+        "and audit-readiness review.",
     },
     "marketing": {
         "role": "Marketing Strategist",
         "goal": "Marketing and growth",
         "backstory": "Digital marketing expert",
         "icon": "📣",
+        "capabilities": "Positioning, growth strategy, customer segmentation and "
+        "go-to-market / channel planning.",
     },
     "data_analytics": {
         "role": "Data Analytics Expert",
         "goal": "Data insights",
         "backstory": "Data scientist",
         "icon": "🔬",
+        "capabilities": "Trend and metric analysis, forecasting, KPI definition "
+        "and data-driven insights.",
     },
 }
 
 DEFAULT_AGENT = "finance"
+
+# Beginner-friendly starter prompts for the chat box (clickable suggestions).
+STARTER_PROMPTS: list[str] = [
+    "Summarize this document in plain language.",
+    "What are the key risks I should flag?",
+    "List the main obligations, deadlines, and responsibilities.",
+    "Extract the key financial terms and numbers.",
+    "What questions should I ask before signing this?",
+    "Give me 3 red flags and 3 strengths.",
+]
 
 
 @dataclass

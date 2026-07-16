@@ -209,6 +209,29 @@ body.app { display: flex; min-height: 100vh; }
 
 .chat-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 
+/* ---------- Beginner starter prompts (chips) ---------- */
+.starter-prompts { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0.1rem 0 0.2rem; }
+.starter-label { color: var(--muted); font-size: 0.72rem; }
+.chip {
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 0.25rem 0.6rem; font-size: 0.72rem; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Agent specialty cards (dashboard) ---------- */
+.agents-intro { margin-top: -0.5rem; margin-bottom: 1rem; }
+.agent-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1rem;
+}
+.agent-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+.agent-icon { font-size: 1.4rem; }
+.agent-head strong { font-size: 0.98rem; }
+.agent-goal { color: var(--accent); font-size: 0.76rem; }
+.agent-caps { color: var(--muted); font-size: 0.84rem; margin: 0; line-height: 1.5; }
+.caps-label { color: var(--ink); font-weight: 600; }
+
 /* ---------- Assistant panel (fixed, large) ---------- */
 .assistant {
     background: #0f1413; border: 1px solid var(--border);

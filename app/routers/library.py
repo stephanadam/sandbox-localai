@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.ai_service import AGENTS
 from app.audit import log_event
 from app.auth import get_current_user
 from app.config import settings
@@ -42,7 +43,7 @@ def dashboard(
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"user": user, "uploaded": uploaded, "analyzed": analyzed},
+        {"user": user, "uploaded": uploaded, "analyzed": analyzed, "agents": AGENTS},
     )
 
 

@@ -28,4 +28,21 @@
         <a href="/chat" class="btn">Chat</a>
     </div>
 </div>
+
+<h2 class="section-title">AI agents &amp; specialties</h2>
+<p class="muted agents-intro">Pick the agent whose specialty best matches your task in the Chat menu.</p>
+<div class="grid">
+    {% for key, a in agents.items() %}
+    <div class="agent-card">
+        <div class="agent-head">
+            <span class="agent-icon">{{ a.icon }}</span>
+            <div>
+                <strong>{{ a.role }}</strong>
+                <div class="agent-goal">{{ a.goal }}</div>
+            </div>
+        </div>
+        <p class="agent-caps"><span class="caps-label">Capable of:</span> {{ a.capabilities }}</p>
+    </div>
+    {% endfor %}
+</div>
 {% endblock %}

@@ -7,7 +7,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai_service import AGENTS, DEFAULT_AGENT, agent_or_default, ask_agent
+from app.ai_service import (
+    AGENTS,
+    DEFAULT_AGENT,
+    STARTER_PROMPTS,
+    agent_or_default,
+    ask_agent,
+)
 from app.audit import log_event
 from app.auth import get_current_user
 from app.config import settings
@@ -89,6 +95,7 @@ def chat_page(
             "default_agent": DEFAULT_AGENT,
             "active": active,
             "messages": messages,
+            "starter_prompts": STARTER_PROMPTS,
         },
     )
 

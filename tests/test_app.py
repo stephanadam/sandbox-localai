@@ -83,6 +83,24 @@ def test_register_lands_on_dashboard(client):
     assert "Alternative Finance" not in resp.text
 
 
+def test_dashboard_shows_agent_specialties(client):
+    _register(client)
+    page = client.get("/dashboard").text
+    assert "AI agents &amp; specialties" in page or "AI agents & specialties" in page
+    # Agent role + capability description are present.
+    assert "Underwriting &amp; Risk Manager" in page or "Underwriting & Risk Manager" in page
+    assert "Capable of:" in page
+    assert "creditworthiness" in page  # part of the risk agent's capabilities
+
+
+def test_chat_shows_starter_prompts(client):
+    _register(client)
+    _upload(client, "Starter Doc", content=b"revenue and yield content")
+    page = client.get("/chat").text
+    assert "data-prompt=" in page
+    assert "Summarize this document in plain language." in page
+
+
 def test_nav_has_three_menus(client):
     _register(client)
     page = client.get("/dashboard").text
