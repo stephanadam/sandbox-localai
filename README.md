@@ -1,20 +1,25 @@
-# sandbox-localai — Legal Analyst
+# sandbox-localai — AcmeCO
 
-A **local-only** web front end for legal analyst workflows, designed to run on a
-local server and act as the UI layer for a larger local AI system.
+A **local-only** web front end for financial/legal analyst workflows, designed to
+run on a local server and act as the UI layer for a larger local AI system.
 
 ## Features
 
 - **Sign-in / registration** with session cookies and `bcrypt`-hashed passwords.
 - **Local SQLite database** (via SQLAlchemy) — zero-config, file-based, ideal for
   a self-hosted local server. Swap `DATABASE_URL` for PostgreSQL to scale later.
-- **Legal analysis workspace**: paste a contract/filing/clause, pick an analysis
-  type (summary, risk spotting, clause extraction, obligations), and store the
-  result. Each user sees only their own analyses.
+- **Single-folder document library**: upload text files (TXT/PDF/DOCX/XLSX); their
+  text is extracted and used as RAG context. Each user sees only their own files.
+- **Per-file assistant conversations**: select a file and chat with a specialist
+  agent about it. Each file keeps its **own saved question/response history** so
+  you can revisit it later. The chat is a fixed, large panel.
+- **Seven specialist agents** (finance, capital markets, underwriting & risk,
+  legal, accounting, marketing, data analytics).
+- **Audit log** of all transactions and AI responses in `logs/acmeco.log`.
 - **Pluggable AI backend** (`app/ai_service.py`):
-  - `mock` (default) — fully offline heuristic analysis, no external service.
-  - `ollama` — calls a local [Ollama](https://ollama.com) server (the "bigger
-    local AI system"), falling back to `mock` if unavailable.
+  - `mock` (default) — fully offline, agent-aware heuristic, no external service.
+  - `ollama` / `anythingllm` — call a local LLM / RAG service (the "bigger local
+    AI system"), falling back to `mock` if unavailable.
 
 ## Tech stack
 
