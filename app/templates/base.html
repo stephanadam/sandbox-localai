@@ -26,8 +26,9 @@
         </div>
 
         <nav class="nav">
-            <a href="/dashboard">▦ Dashboard</a>
-            <a href="/documents">🗂 Documents</a>
+            <a href="/dashboard" class="{% if request.url.path == '/dashboard' %}active{% endif %}">▦ Dashboard</a>
+            <a href="/documents" class="{% if request.url.path.startswith('/documents') %}active{% endif %}">🗂 Documents</a>
+            <a href="/chat" class="{% if request.url.path == '/chat' %}active{% endif %}">💬 Chat</a>
         </nav>
 
         <div class="cluster-status">

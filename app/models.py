@@ -36,6 +36,8 @@ class Document(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     # Retained for backward compatibility; all uploads now live in one folder.
     module: Mapped[str] = mapped_column(String(64), default="files", index=True)
+    # "upload" = user-uploaded file; "analysis" = saved AI chat response.
+    kind: Mapped[str] = mapped_column(String(16), default="upload", index=True)
     title: Mapped[str] = mapped_column(String(255))
     original_name: Mapped[str] = mapped_column(String(255), default="")
     stored_path: Mapped[str] = mapped_column(String(512), default="")

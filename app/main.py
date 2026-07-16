@@ -54,7 +54,7 @@ templates.env.globals["doc_count"] = _doc_count
 @app.get("/")
 def index(user: User | None = Depends(get_current_user)):
     if user:
-        return RedirectResponse(url="/documents", status_code=303)
+        return RedirectResponse(url="/dashboard", status_code=303)
     return RedirectResponse(url="/login", status_code=303)
 
 

@@ -1,104 +1,57 @@
 {% extends "base.html" %}
 {% block title %}Documents{% endblock %}
 {% block content %}
-<div class="workspace">
-    <section class="files-col">
-        <div class="files-head">
-            <h2 class="section-title">Files</h2>
-            <button class="btn btn-sm" onclick="document.getElementById('upload').classList.toggle('open')">
-                + Upload
-            </button>
-        </div>
+<div class="documents-page">
+    <div class="library-head">
+        <h2 class="section-title">Documents</h2>
+        <button class="btn" onclick="document.getElementById('upload').classList.toggle('open')">
+            + Upload document
+        </button>
+    </div>
 
-        <div id="upload" class="card upload-card">
-            <form method="post" action="/documents/upload" enctype="multipart/form-data">
-                <label>Title (optional)
-                    <input type="text" name="title" placeholder="Defaults to file name">
-                </label>
-                <label>File (TXT, PDF, DOCX, XLSX)
-                    <input type="file" name="file" required>
-                </label>
-                <button type="submit" class="btn btn-block">Upload &amp; index</button>
-            </form>
-        </div>
+    <div id="upload" class="card upload-card">
+        <form method="post" action="/documents/upload" enctype="multipart/form-data">
+            <label>Title (optional)
+                <input type="text" name="title" placeholder="Defaults to file name">
+            </label>
+            <label>File (TXT, PDF, DOCX, XLSX)
+                <input type="file" name="file" required>
+            </label>
+            <button type="submit" class="btn btn-block">Upload &amp; index</button>
+        </form>
+    </div>
 
-        <div class="file-list">
-            {% if not files %}
-                <p class="muted empty-note">No files yet. Upload one to start a conversation.</p>
-            {% endif %}
-            {% for doc in files %}
-            <div class="file-item {% if active and doc.id == active.id %}selected{% endif %}">
-                <a class="file-open" href="/documents?doc={{ doc.id }}#assistant">
-                    <span class="doc-icon">📄</span>
-                    <span class="doc-meta">
-                        <strong>{{ doc.title }}</strong>
-                        <small>{{ (doc.size_bytes / 1024)|round(1) }} KB</small>
-                    </span>
-                </a>
-                <form method="post" action="/documents/{{ doc.id }}/delete"
-                      onsubmit="return confirm('Delete “{{ doc.title }}” and its conversation?');">
-                    <button type="submit" class="file-del" title="Remove file">🗑</button>
-                </form>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-
-    <aside class="assistant" id="assistant">
-        <div class="assistant-head">
-            <div>
-                <strong>Assistant (RAG)</strong>
-                {% if active %}
-                    <div class="active-file">Conversation for: {{ active.title }}</div>
-                {% endif %}
-            </div>
-            <span class="badge-backend">{{ ai_backend }}</span>
-        </div>
-
-        {% if not active %}
-            <div class="chat-log">
-                <p class="muted">Select a file on the left (or upload one) to start its conversation.</p>
-            </div>
-        {% else %}
-            <div class="chat-log">
-                {% if not messages %}
-                    <p class="muted">No questions yet for this file. Ask one below — it will be saved so you can revisit it later.</p>
-                {% endif %}
-                {% for m in messages %}
-                    {% if m.sender == 'user' %}
-                        <div class="bubble user">{{ m.content }}</div>
+    {% if not files %}
+        <div class="card"><p class="muted">No documents yet. Upload one to get started.</p></div>
+    {% else %}
+    <table class="table doc-table">
+        <thead>
+            <tr><th>Title</th><th>Type</th><th>Size</th><th>Added</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for doc in files %}
+            <tr>
+                <td><a class="doc-link" href="/documents/{{ doc.id }}">📄 {{ doc.title }}</a></td>
+                <td>
+                    {% if doc.kind == 'analysis' %}
+                        <span class="tag tag-analysis">Analysis</span>
                     {% else %}
-                        <div class="bubble assistant-bubble">{{ m.content }}</div>
+                        <span class="tag">Upload</span>
                     {% endif %}
-                {% endfor %}
-            </div>
-
-            <form class="chat-form" method="post" action="/assistant/ask">
-                <div class="chat-selects">
-                    <label class="sr-label">Agent
-                        <select name="agent_key">
-                            {% for key, a in agents.items() %}
-                                <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
-                                    {{ a.icon }} {{ a.role }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label class="sr-label">Document to send
-                        <select name="document_id">
-                            {% for doc in files %}
-                                <option value="{{ doc.id }}" {% if active and doc.id == active.id %}selected{% endif %}>
-                                    {{ doc.title }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                </div>
-                <textarea name="question" rows="3" placeholder="Ask about the selected document..." required></textarea>
-                <button type="submit" class="btn btn-block">Send to Assistant</button>
-            </form>
-        {% endif %}
-    </aside>
+                </td>
+                <td>{{ (doc.size_bytes / 1024)|round(1) }} KB</td>
+                <td>{{ doc.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                <td class="row-actions">
+                    <a class="btn-link" href="/documents/{{ doc.id }}">View</a>
+                    <form method="post" action="/documents/{{ doc.id }}/delete"
+                          onsubmit="return confirm('Delete “{{ doc.title }}”?');">
+                        <button type="submit" class="file-del" title="Remove">🗑</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
 </div>
-<script src="/static/js/assistant.js"></script>
 {% endblock %}

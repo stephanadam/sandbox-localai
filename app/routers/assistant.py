@@ -1,26 +1,26 @@
 import os
+import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai_service import agent_or_default, ask_agent
+from app.ai_service import AGENTS, DEFAULT_AGENT, agent_or_default, ask_agent
 from app.audit import log_event
 from app.auth import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.extract import extract_text
 from app.models import ChatMessage, Document, User
+from app.templating import templates
 
 router = APIRouter()
 
 
 def _resolve_context(db: Session, doc: Document) -> str:
-    """Return the document's text, re-extracting from disk if needed.
-
-    Older uploads (or uploads made before a parser was available) may have empty
-    ``extracted_text``. Try reading the stored file again so an attached document
-    actually supports the request instead of silently being ignored.
-    """
+    """Return the document's text, re-extracting from disk if needed."""
     if doc.extracted_text:
         return doc.extracted_text
     if doc.stored_path and os.path.exists(doc.stored_path):
@@ -38,6 +38,105 @@ def _resolve_context(db: Session, doc: Document) -> str:
     return ""
 
 
+def _upload_documents(db: Session, user_id: int) -> list[Document]:
+    return list(
+        db.scalars(
+            select(Document)
+            .where(Document.user_id == user_id, Document.kind == "upload")
+            .order_by(Document.created_at.desc())
+        ).all()
+    )
+
+
+@router.get("/chat", response_class=HTMLResponse)
+def chat_page(
+    request: Request,
+    doc: str = "",
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login", status_code=303)
+
+    files = _upload_documents(db, user.id)
+
+    active: Document | None = None
+    if doc.strip().isdigit():
+        candidate = db.get(Document, int(doc))
+        if candidate and candidate.user_id == user.id and candidate.kind == "upload":
+            active = candidate
+    if active is None and files:
+        active = files[0]
+
+    messages = []
+    if active is not None:
+        messages = db.scalars(
+            select(ChatMessage)
+            .where(
+                ChatMessage.user_id == user.id,
+                ChatMessage.document_id == active.id,
+            )
+            .order_by(ChatMessage.created_at.asc())
+        ).all()
+
+    return templates.TemplateResponse(
+        request,
+        "chat.html",
+        {
+            "user": user,
+            "files": files,
+            "agents": AGENTS,
+            "default_agent": DEFAULT_AGENT,
+            "active": active,
+            "messages": messages,
+        },
+    )
+
+
+def _save_analysis_file(
+    db: Session, user: User, source: Document, agent_key: str,
+    question: str, response_text: str,
+) -> Document:
+    """Persist an AI response as a TEXT file + an 'analysis' Document record."""
+    os.makedirs(settings.upload_dir, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    role = AGENTS[agent_key]["role"]
+    body = (
+        f"Analysis by: {role}\n"
+        f"Source document: {source.title}\n"
+        f"Question: {question}\n"
+        f"Generated: {stamp} UTC\n"
+        f"{'-' * 60}\n\n{response_text}\n"
+    )
+    filename = f"analysis_{uuid.uuid4().hex}.txt"
+    stored_path = os.path.join(settings.upload_dir, filename)
+    with open(stored_path, "w", encoding="utf-8") as fh:
+        fh.write(body)
+
+    title = f"Analysis: {source.title} — {question[:40]}".strip()
+    analysis = Document(
+        user_id=user.id,
+        kind="analysis",
+        title=title,
+        original_name=filename,
+        stored_path=stored_path,
+        content_type="text/plain",
+        size_bytes=len(body.encode("utf-8")),
+        extracted_text=body,
+    )
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
+    log_event(
+        "document.analysis_saved",
+        user=user.email,
+        title=analysis.title,
+        source=source.title,
+        path=stored_path,
+    )
+    return analysis
+
+
 @router.post("/assistant/ask")
 def ask(
     request: Request,
@@ -52,25 +151,23 @@ def ask(
 
     question = question.strip()
     if not question:
-        return RedirectResponse(url="/documents", status_code=303)
+        return RedirectResponse(url="/chat", status_code=303)
 
     agent_key = agent_or_default(agent_key)
 
-    # Conversations are scoped to a single text file; a valid file is required.
+    # Conversations are scoped to a single upload file; a valid file is required.
     doc: Document | None = None
-    doc_id_int: int | None = None
     if document_id.strip().isdigit():
         candidate = db.get(Document, int(document_id))
-        if candidate and candidate.user_id == user.id:
+        if candidate and candidate.user_id == user.id and candidate.kind == "upload":
             doc = candidate
-            doc_id_int = candidate.id
     if doc is None:
         log_event(
             "assistant.document_missing",
             user=user.email,
             requested_document_id=document_id,
         )
-        return RedirectResponse(url="/documents", status_code=303)
+        return RedirectResponse(url="/chat", status_code=303)
 
     db.add(
         ChatMessage(
@@ -78,7 +175,7 @@ def ask(
             agent_key=agent_key,
             sender="user",
             content=question,
-            document_id=doc_id_int,
+            document_id=doc.id,
         )
     )
     db.commit()
@@ -89,7 +186,7 @@ def ask(
         user=user.email,
         agent=agent_key,
         document=doc.title,
-        document_id=doc_id_int,
+        document_id=doc.id,
         context_chars=(len(context) if context else 0),
         question=question,
     )
@@ -102,7 +199,7 @@ def ask(
             agent_key=agent_key,
             sender="assistant",
             content=reply.text,
-            document_id=doc_id_int,
+            document_id=doc.id,
             backend=reply.backend,
         )
     )
@@ -114,4 +211,8 @@ def ask(
         backend=reply.backend,
         response=reply.text,
     )
-    return RedirectResponse(url=f"/documents?doc={doc_id_int}#assistant", status_code=303)
+
+    # Persist the response as a TEXT file + analysis document (revisit in Documents).
+    _save_analysis_file(db, user, doc, agent_key, question, reply.text)
+
+    return RedirectResponse(url=f"/chat?doc={doc.id}#assistant", status_code=303)

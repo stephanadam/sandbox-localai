@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.ai_service import AGENTS, DEFAULT_AGENT
 from app.audit import log_event
 from app.auth import get_current_user
 from app.config import settings
@@ -22,16 +21,6 @@ def _require(user: User | None):
     return None if user else RedirectResponse(url="/login", status_code=303)
 
 
-def _user_documents(db: Session, user_id: int) -> list[Document]:
-    return list(
-        db.scalars(
-            select(Document)
-            .where(Document.user_id == user_id)
-            .order_by(Document.created_at.desc())
-        ).all()
-    )
-
-
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -40,11 +29,20 @@ def dashboard(
 ):
     if (r := _require(user)):
         return r
-    total = db.scalar(
-        select(func.count(Document.id)).where(Document.user_id == user.id)
+    uploaded = db.scalar(
+        select(func.count(Document.id)).where(
+            Document.user_id == user.id, Document.kind == "upload"
+        )
+    ) or 0
+    analyzed = db.scalar(
+        select(func.count(Document.id)).where(
+            Document.user_id == user.id, Document.kind == "analysis"
+        )
     ) or 0
     return templates.TemplateResponse(
-        request, "dashboard.html", {"user": user, "total": total}
+        request,
+        "dashboard.html",
+        {"user": user, "uploaded": uploaded, "analyzed": analyzed},
     )
 
 
@@ -52,15 +50,19 @@ def dashboard(
 def documents(
     request: Request,
     q: str = "",
-    doc: str = "",
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
     if (r := _require(user)):
         return r
 
-    files = _user_documents(db, user.id)
-
+    files = list(
+        db.scalars(
+            select(Document)
+            .where(Document.user_id == user.id)
+            .order_by(Document.created_at.desc())
+        ).all()
+    )
     q = q.strip()
     if q:
         needle = q.lower()
@@ -69,38 +71,25 @@ def documents(
             if needle in d.title.lower() or needle in (d.original_name or "").lower()
         ]
 
-    # Resolve the active file (per-file conversation). Default to the newest.
-    active: Document | None = None
-    if doc.strip().isdigit():
-        candidate = db.get(Document, int(doc))
-        if candidate and candidate.user_id == user.id:
-            active = candidate
-    if active is None and files:
-        active = files[0]
-
-    messages = []
-    if active is not None:
-        messages = db.scalars(
-            select(ChatMessage)
-            .where(
-                ChatMessage.user_id == user.id,
-                ChatMessage.document_id == active.id,
-            )
-            .order_by(ChatMessage.created_at.asc())
-        ).all()
-
     return templates.TemplateResponse(
-        request,
-        "documents.html",
-        {
-            "user": user,
-            "files": files,
-            "agents": AGENTS,
-            "default_agent": DEFAULT_AGENT,
-            "active": active,
-            "messages": messages,
-            "q": q,
-        },
+        request, "documents.html", {"user": user, "files": files, "q": q}
+    )
+
+
+@router.get("/documents/{doc_id}", response_class=HTMLResponse)
+def document_view(
+    doc_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    if (r := _require(user)):
+        return r
+    doc = db.get(Document, doc_id)
+    if doc is None or doc.user_id != user.id:
+        return RedirectResponse(url="/documents", status_code=303)
+    return templates.TemplateResponse(
+        request, "document_view.html", {"user": user, "doc": doc}
     )
 
 
@@ -125,6 +114,7 @@ async def upload_document(
     text = extract_text(data, file.filename or "", file.content_type or "")
     doc = Document(
         user_id=user.id,
+        kind="upload",
         title=(title.strip() or (file.filename or "Untitled document")),
         original_name=file.filename or "",
         stored_path=stored_path,
@@ -143,8 +133,7 @@ async def upload_document(
         size_bytes=doc.size_bytes,
         extracted_chars=len(text),
     )
-    # Open the freshly uploaded file's conversation.
-    return RedirectResponse(url=f"/documents?doc={doc.id}", status_code=303)
+    return RedirectResponse(url="/documents", status_code=303)
 
 
 @router.post("/documents/{doc_id}/delete")
@@ -161,7 +150,6 @@ def delete_document(
     if doc is None or doc.user_id != user.id:
         return RedirectResponse(url="/documents", status_code=303)
 
-    # Remove the file's conversation, the stored file on disk, then the record.
     db.execute(
         delete(ChatMessage).where(
             ChatMessage.document_id == doc.id, ChatMessage.user_id == user.id

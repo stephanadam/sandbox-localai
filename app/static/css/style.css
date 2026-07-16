@@ -160,7 +160,17 @@ body.app { display: flex; min-height: 100vh; }
 }
 .stat-num { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
 .stat-label { color: var(--muted); font-size: 0.8rem; }
-.cta-row { margin-top: 1.4rem; }
+.cta-row { margin-top: 1.4rem; display: flex; gap: 0.6rem; }
+
+.tag-analysis { background: rgba(22,199,132,0.14); color: var(--accent); }
+
+/* ---------- Documents table ---------- */
+.documents-page .upload-card { margin-bottom: 1rem; }
+.doc-table { margin-top: 0.5rem; }
+.doc-link { color: var(--ink); font-weight: 600; }
+.doc-link:hover { color: var(--accent); }
+.row-actions { display: flex; align-items: center; gap: 0.6rem; justify-content: flex-end; }
+.row-actions form { display: inline; }
 
 /* ---------- Workspace: single file list + big fixed chat ---------- */
 .workspace {
