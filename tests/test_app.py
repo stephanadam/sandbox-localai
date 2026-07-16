@@ -40,6 +40,27 @@ def _register(client):
     )
 
 
+def _upload(client, title, content=b"placeholder text", filename=None, ctype="text/plain"):
+    resp = client.post(
+        "/documents/upload",
+        data={"title": title},
+        files={"file": (filename or (title + ".txt"), io.BytesIO(content), ctype)},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    return _doc_id(title)
+
+
+def _doc_id(title):
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models import Document
+
+    with SessionLocal() as db:
+        return db.scalar(select(Document.id).where(Document.title == title))
+
+
 def test_healthz(client):
     resp = client.get("/healthz")
     assert resp.status_code == 200
@@ -52,13 +73,14 @@ def test_protected_redirects_when_logged_out(client):
     assert resp.headers["location"] == "/login"
 
 
-def test_register_shows_library(client):
+def test_register_lands_on_dashboard(client):
     resp = _register(client)
     assert resp.status_code == 200
-    assert "Document Library" in resp.text
-    # Sidebar shows the modules and the connected cluster status.
-    assert "Alternative Finance" in resp.text
+    assert "Files uploaded" in resp.text
+    assert "Go to Documents" in resp.text
+    # Sidebar cluster status is present; module folders are gone.
     assert "Cluster:" in resp.text
+    assert "Alternative Finance" not in resp.text
 
 
 def test_upload_document_and_ask_agent(client):
@@ -69,26 +91,20 @@ def test_upload_document_and_ask_agent(client):
         b"The parties agree to indemnify against liability and breach. IRR and ROI "
         b"projections are strong."
     )
-    resp = client.post(
-        "/documents/upload",
-        data={"module": "alternative_finance", "title": "Royalty Financing Guide 2026"},
-        files={"file": ("royalty.txt", io.BytesIO(content), "text/plain")},
-        follow_redirects=True,
-    )
-    assert resp.status_code == 200
-    assert "Royalty Financing Guide 2026" in resp.text
+    doc_id = _upload(client, "Royalty Financing Guide 2026", content=content)
+    assert doc_id is not None
 
-    # Find the uploaded document id from the library page select options.
-    page = client.get("/documents").text
+    # The uploaded file's conversation view is shown.
+    page = client.get(f"/documents?doc={doc_id}").text
     assert "Royalty Financing Guide 2026" in page
+    assert "Conversation for: Royalty Financing Guide 2026" in page
 
-    # Ask the finance agent about the document.
     resp = client.post(
         "/assistant/ask",
         data={
             "question": "Summarize the yields and key risks.",
             "agent_key": "finance",
-            "document_id": "1",
+            "document_id": str(doc_id),
         },
         follow_redirects=True,
     )
@@ -96,8 +112,45 @@ def test_upload_document_and_ask_agent(client):
     text = resp.text
     assert "Finance Specialist" in text
     assert "Summarize the yields and key risks." in text
-    # Mock backend echoes detected terms from the document context.
     assert "Reviewed the attached document" in text
+
+
+def test_conversation_is_per_file(client):
+    _register(client)
+    a_id = _upload(client, "Alpha Memo", content=b"Alpha revenue and yield details.")
+    b_id = _upload(client, "Beta Memo", content=b"Beta market and funding details.")
+
+    client.post(
+        "/assistant/ask",
+        data={"question": "ALPHA_QUESTION_MARKER", "agent_key": "finance",
+              "document_id": str(a_id)},
+        follow_redirects=True,
+    )
+    client.post(
+        "/assistant/ask",
+        data={"question": "BETA_QUESTION_MARKER", "agent_key": "legal",
+              "document_id": str(b_id)},
+        follow_redirects=True,
+    )
+
+    a_page = client.get(f"/documents?doc={a_id}").text
+    assert "ALPHA_QUESTION_MARKER" in a_page
+    assert "BETA_QUESTION_MARKER" not in a_page
+
+    b_page = client.get(f"/documents?doc={b_id}").text
+    assert "BETA_QUESTION_MARKER" in b_page
+    assert "ALPHA_QUESTION_MARKER" not in b_page
+
+
+def test_ask_without_valid_document_redirects(client):
+    _register(client)
+    resp = client.post(
+        "/assistant/ask",
+        data={"question": "no file selected", "agent_key": "finance", "document_id": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/documents"
 
 
 def test_search_filters_documents(client):
@@ -114,43 +167,13 @@ def test_bad_login_rejected(client):
     assert resp.status_code == 401
 
 
-def test_assistant_preferences_persist(client):
-    _register(client)
-    resp = client.post("/assistant/preferences", json={"width": 700, "height": 800})
-    assert resp.status_code == 200
-    assert resp.json() == {"width": 700, "height": 800}
-
-    # Values are clamped to sane bounds.
-    resp = client.post("/assistant/preferences", json={"width": 99, "height": 99999})
-    assert resp.json() == {"width": 300, "height": 2000}
-
-    # Saved size is reflected in the rendered panel.
-    page = client.get("/documents").text
-    assert "width:300px" in page.replace(" ", "")
-
-
 def test_attached_document_with_no_text_message(client):
     _register(client)
-    # Upload a .pdf whose bytes aren't a real PDF, so extraction yields no text
-    # (mirrors a scanned/image PDF that can't be parsed to text).
-    resp = client.post(
-        "/documents/upload",
-        data={"module": "acquisitions", "title": "Scanned Deck"},
-        files={"file": ("deck.pdf", io.BytesIO(b"not a real pdf body"), "application/pdf")},
-        follow_redirects=True,
+    # A .pdf whose bytes aren't a real PDF, so extraction yields no text.
+    doc_id = _upload(
+        client, "Scanned Deck", content=b"not a real pdf body",
+        filename="deck.pdf", ctype="application/pdf",
     )
-    assert resp.status_code == 200
-
-    # Find the id of the just-uploaded document via the DB.
-    from sqlalchemy import select
-
-    from app.database import SessionLocal
-    from app.models import Document
-
-    with SessionLocal() as db:
-        doc_id = db.scalar(
-            select(Document.id).where(Document.title == "Scanned Deck")
-        )
     assert doc_id is not None
 
     resp = client.post(
@@ -172,7 +195,7 @@ def test_audit_log_written(client):
     assert os.path.exists(log_path)
     with open(log_path, encoding="utf-8") as fh:
         contents = fh.read()
-    # Auth, upload and assistant events are all captured.
     assert "login.success" in contents or "register.success" in contents
+    assert "document.upload" in contents
     assert "assistant.ask" in contents
     assert "assistant.response" in contents

@@ -19,10 +19,6 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
-    # Per-user UI preference: size of the assistant chat panel (pixels).
-    assistant_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    assistant_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
-
     documents: Mapped[list["Document"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
@@ -38,7 +34,8 @@ class Document(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    module: Mapped[str] = mapped_column(String(64), index=True)
+    # Retained for backward compatibility; all uploads now live in one folder.
+    module: Mapped[str] = mapped_column(String(64), default="files", index=True)
     title: Mapped[str] = mapped_column(String(255))
     original_name: Mapped[str] = mapped_column(String(255), default="")
     stored_path: Mapped[str] = mapped_column(String(512), default="")

@@ -26,12 +26,8 @@
         </div>
 
         <nav class="nav">
-            <a href="/dashboard" class="{% if active == 'dashboard' %}active{% endif %}">▦ Dashboard</a>
-            <a href="/documents" class="{% if active == 'documents' %}active{% endif %}">🗂 Documents</a>
-            <div class="nav-label">Modules</div>
-            {% for key, label in modules_nav.items() %}
-                <a href="/documents#module-{{ key }}">• {{ label }}</a>
-            {% endfor %}
+            <a href="/dashboard">▦ Dashboard</a>
+            <a href="/documents">🗂 Documents</a>
         </nav>
 
         <div class="cluster-status">

@@ -4,11 +4,7 @@
 <div class="stats-row">
     <div class="stat-card">
         <span class="stat-num">{{ total }}</span>
-        <span class="stat-label">Total documents</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-num">{{ modules|length }}</span>
-        <span class="stat-label">Modules</span>
+        <span class="stat-label">Files uploaded</span>
     </div>
     <div class="stat-card">
         <span class="stat-num">7</span>
@@ -16,20 +12,12 @@
     </div>
 </div>
 
-<h2 class="section-title">Modules</h2>
-<div class="grid">
-    {% for key, label in modules.items() %}
-    <div class="folder-card">
-        <div class="folder-head">
-            <span class="folder-name">📁 {{ label }}</span>
-            <span class="file-badge">{{ grouped[key]|length }} files</span>
-        </div>
-        <a class="folder-open" href="/documents#module-{{ key }}">Open module →</a>
-    </div>
-    {% endfor %}
-</div>
-
-<div class="cta-row">
-    <a href="/documents" class="btn">Go to Document Library</a>
+<div class="card">
+    <h2 class="section-title">Welcome, {{ user.full_name or user.email }}</h2>
+    <p class="muted">
+        Upload text files and chat with a specialist agent about each one.
+        Every file keeps its own question &amp; answer history so you can revisit it later.
+    </p>
+    <a href="/documents" class="btn">Go to Documents</a>
 </div>
 {% endblock %}

@@ -162,28 +162,42 @@ body.app { display: flex; min-height: 100vh; }
 .stat-label { color: var(--muted); font-size: 0.8rem; }
 .cta-row { margin-top: 1.4rem; }
 
-/* ---------- Library layout with assistant ---------- */
-.library-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: start; }
-.library-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+/* ---------- Workspace: single file list + big fixed chat ---------- */
+.workspace {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 1.2rem;
+    align-items: start;
+}
+.files-col { display: flex; flex-direction: column; }
+.files-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
 
-.upload-card { display: none; }
+.upload-card { display: none; margin-bottom: 1rem; }
 .upload-card.open { display: block; }
-.upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
 
-/* ---------- Assistant panel ---------- */
+.file-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.file-item {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.65rem 0.7rem; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--panel);
+}
+.file-item:hover { border-color: var(--accent-dark); }
+.file-item.selected { border-color: var(--accent); background: var(--panel-2); }
+.file-item .doc-meta strong { font-size: 0.86rem; }
+.file-item .doc-meta small { color: var(--muted); font-size: 0.72rem; }
+
+/* ---------- Assistant panel (fixed, large) ---------- */
 .assistant {
     background: #0f1413; border: 1px solid var(--border);
-    border-radius: 14px; padding: 1rem;
+    border-radius: 14px; padding: 1.2rem;
     position: sticky; top: 1rem;
     display: flex; flex-direction: column;
-    /* Enlarged default size, and user-resizable (persisted per profile). */
-    width: 440px; height: 620px;
-    min-width: 320px; min-height: 360px;
-    max-width: 1200px; max-height: 2000px;
-    resize: both; overflow: auto;
+    /* Fixed, much larger chat window. */
+    height: calc(100vh - 7rem);
+    min-height: 520px;
 }
-.assistant-head { display: flex; align-items: center; justify-content: space-between; }
-.resize-hint { color: #55635e; font-size: 0.66rem; margin: 0.15rem 0 0.4rem; }
+.assistant-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.active-file { color: var(--accent); font-size: 0.74rem; margin-top: 0.2rem; }
 .badge-backend {
     background: var(--panel-2); color: var(--accent);
     border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.68rem;
@@ -221,6 +235,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .btn:hover { background: var(--accent-dark); }
 .btn-block { width: 100%; }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
 
 .muted { color: var(--muted); }
 .error {
@@ -242,6 +257,6 @@ body.auth { display: flex; align-items: center; justify-content: center; min-hei
 .auth-card a { color: var(--accent); }
 
 @media (max-width: 900px) {
-    .library-layout { grid-template-columns: 1fr; }
-    .assistant { position: static; width: 100%; height: auto; resize: vertical; }
+    .workspace { grid-template-columns: 1fr; }
+    .assistant { position: static; height: 70vh; }
 }

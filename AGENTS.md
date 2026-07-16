@@ -5,11 +5,12 @@
 `sandbox-localai` is **AcmeCO**, a **local-only** financial/legal document
 workspace: a FastAPI + Jinja2 (dark UI) front end backed by SQLite (SQLAlchemy),
 intended to run on a self-hosted local server as the UI layer for a larger local
-AI system. Core pieces: sign-in, a document library organized into modules
-(`app/ai_service.py` → `MODULES`), document upload + text extraction
-(`app/extract.py`), and a RAG assistant that routes questions to one of seven
-specialist agents (`app/ai_service.py` → `AGENTS`). See `README.md` for the
-feature list and standard run/test commands.
+AI system. Core pieces: sign-in, a single-folder document library (text-file
+upload), document text extraction (`app/extract.py`), and a RAG assistant that
+routes questions to one of seven specialist agents (`app/ai_service.py` →
+`AGENTS`). Conversations are **per file**: each uploaded file has its own saved
+query/response history (`ChatMessage.document_id`), viewable by selecting that
+file (`/documents?doc=<id>`). See `README.md` for run/test commands.
 
 ## Cursor Cloud specific instructions
 
@@ -41,11 +42,9 @@ feature list and standard run/test commands.
   are written to `<LOG_DIR>/acmeco.log` (default `./logs/`, git-ignored, rotating)
   via `app/audit.py` `log_event()`; it also mirrors to stdout. `LOG_DIR` is
   configurable.
-- **Assistant panel size** is a per-user preference (`users.assistant_width/height`)
-  saved by the CSS resize handle via `POST /assistant/preferences` and reapplied
-  on load. New nullable columns are added to existing SQLite DBs by an additive
-  migration in `database.py` `_migrate_sqlite()` (runs inside `init_db`), so
-  older local databases keep working without a manual migration.
+- **Assistant chat** is a fixed, large panel (not resizable). Conversations are
+  scoped to the selected file, so `/assistant/ask` requires a valid `document_id`
+  belonging to the user.
 - **Uploads:** stored under `UPLOAD_DIR` (default `./uploads/`, git-ignored);
   extracted text is saved on the `Document` row and passed to the agent as RAG
   context. PDF/DOCX/XLSX parsing needs `pypdf`/`python-docx`/`openpyxl` (in

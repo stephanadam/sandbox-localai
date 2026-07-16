@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.ai_service import MODULES
 from app.auth import get_current_user
 from app.config import settings
 from app.database import SessionLocal, init_db
@@ -38,7 +37,6 @@ app.include_router(assistant_router.router)
 
 # Expose app-wide bits to every template.
 templates.env.globals["app_tagline"] = settings.app_tagline
-templates.env.globals["modules_nav"] = MODULES
 templates.env.globals["ai_backend"] = settings.ai_backend
 templates.env.globals["cluster_name"] = settings.opensearch_cluster
 

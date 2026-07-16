@@ -1,7 +1,7 @@
 import os
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.ai_service import agent_or_default, ask_agent
@@ -56,6 +56,7 @@ def ask(
 
     agent_key = agent_or_default(agent_key)
 
+    # Conversations are scoped to a single text file; a valid file is required.
     doc: Document | None = None
     doc_id_int: int | None = None
     if document_id.strip().isdigit():
@@ -63,12 +64,13 @@ def ask(
         if candidate and candidate.user_id == user.id:
             doc = candidate
             doc_id_int = candidate.id
-        else:
-            log_event(
-                "assistant.document_missing",
-                user=user.email,
-                requested_document_id=document_id,
-            )
+    if doc is None:
+        log_event(
+            "assistant.document_missing",
+            user=user.email,
+            requested_document_id=document_id,
+        )
+        return RedirectResponse(url="/documents", status_code=303)
 
     db.add(
         ChatMessage(
@@ -81,23 +83,18 @@ def ask(
     )
     db.commit()
 
-    context = _resolve_context(db, doc) if doc else None
+    context = _resolve_context(db, doc)
     log_event(
         "assistant.ask",
         user=user.email,
         agent=agent_key,
-        document=(doc.title if doc else None),
+        document=doc.title,
         document_id=doc_id_int,
         context_chars=(len(context) if context else 0),
         question=question,
     )
 
-    reply = ask_agent(
-        agent_key,
-        question,
-        context,
-        document_title=(doc.title if doc else None),
-    )
+    reply = ask_agent(agent_key, question, context, document_title=doc.title)
 
     db.add(
         ChatMessage(
@@ -117,42 +114,4 @@ def ask(
         backend=reply.backend,
         response=reply.text,
     )
-    return RedirectResponse(url="/documents#assistant", status_code=303)
-
-
-@router.post("/assistant/preferences")
-async def save_preferences(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
-):
-    """Persist the user's custom assistant-panel size (from the resize handle)."""
-    if user is None:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-    payload = await request.json()
-
-    def _clamp(value, lo, hi):
-        try:
-            return max(lo, min(hi, int(round(float(value)))))
-        except (TypeError, ValueError):
-            return None
-
-    width = _clamp(payload.get("width"), 300, 1200)
-    height = _clamp(payload.get("height"), 300, 2000)
-
-    if width is not None:
-        user.assistant_width = width
-    if height is not None:
-        user.assistant_height = height
-    db.add(user)
-    db.commit()
-    log_event(
-        "assistant.preferences",
-        user=user.email,
-        width=user.assistant_width,
-        height=user.assistant_height,
-    )
-    return JSONResponse(
-        {"width": user.assistant_width, "height": user.assistant_height}
-    )
+    return RedirectResponse(url=f"/documents?doc={doc_id_int}#assistant", status_code=303)

@@ -1,104 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Document Library{% endblock %}
+{% block title %}Documents{% endblock %}
 {% block content %}
-<div class="library-layout">
-    <section class="library-main">
-        <div class="library-head">
-            <h2 class="section-title">Document Library</h2>
-            <button class="btn" onclick="document.getElementById('upload').classList.toggle('open')">
-                + Upload document
+<div class="workspace">
+    <section class="files-col">
+        <div class="files-head">
+            <h2 class="section-title">Files</h2>
+            <button class="btn btn-sm" onclick="document.getElementById('upload').classList.toggle('open')">
+                + Upload
             </button>
         </div>
 
-        <div id="upload" class="card upload-card {% if error %}open{% endif %}">
+        <div id="upload" class="card upload-card">
             <form method="post" action="/documents/upload" enctype="multipart/form-data">
-                <div class="upload-row">
-                    <label>Module
-                        <select name="module">
-                            {% for key, label in modules.items() %}
-                                <option value="{{ key }}">{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label>Title (optional)
-                        <input type="text" name="title" placeholder="Defaults to file name">
-                    </label>
-                </div>
-                <label>File (PDF, DOCX, XLSX, TXT)
+                <label>Title (optional)
+                    <input type="text" name="title" placeholder="Defaults to file name">
+                </label>
+                <label>File (TXT, PDF, DOCX, XLSX)
                     <input type="file" name="file" required>
                 </label>
-                <button type="submit" class="btn">Upload &amp; index</button>
+                <button type="submit" class="btn btn-block">Upload &amp; index</button>
             </form>
         </div>
 
-        <div class="grid">
-            {% for key, label in modules.items() %}
-            <div class="folder-card" id="module-{{ key }}">
-                <div class="folder-head">
-                    <span class="folder-name">📁 {{ label }}</span>
-                    <span class="file-badge">{{ grouped[key]|length }} files</span>
-                </div>
-                {% if grouped[key] %}
-                    {% for doc in grouped[key] %}
-                    <div class="doc-row">
-                        <span class="doc-icon">📄</span>
-                        <div class="doc-meta">
-                            <strong>{{ doc.title }}</strong>
-                            <small>{{ doc.original_name }} · {{ (doc.size_bytes / 1024)|round(1) }} KB</small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="muted empty-note">No files yet.</p>
-                {% endif %}
-            </div>
+        <div class="file-list">
+            {% if not files %}
+                <p class="muted empty-note">No files yet. Upload one to start a conversation.</p>
+            {% endif %}
+            {% for doc in files %}
+            <a class="file-item {% if active and doc.id == active.id %}selected{% endif %}"
+               href="/documents?doc={{ doc.id }}#assistant">
+                <span class="doc-icon">📄</span>
+                <span class="doc-meta">
+                    <strong>{{ doc.title }}</strong>
+                    <small>{{ (doc.size_bytes / 1024)|round(1) }} KB</small>
+                </span>
+            </a>
             {% endfor %}
         </div>
     </section>
 
-    <aside class="assistant" id="assistant"
-           {% if assistant_width or assistant_height %}style="{% if assistant_width %}width:{{ assistant_width }}px;{% endif %}{% if assistant_height %}height:{{ assistant_height }}px;{% endif %}"{% endif %}>
+    <aside class="assistant" id="assistant">
         <div class="assistant-head">
-            <strong>Assistant (RAG)</strong>
+            <div>
+                <strong>Assistant (RAG)</strong>
+                {% if active %}
+                    <div class="active-file">Conversation for: {{ active.title }}</div>
+                {% endif %}
+            </div>
             <span class="badge-backend">{{ ai_backend }}</span>
         </div>
-        <p class="resize-hint">Drag the bottom-right corner to resize · saved to your profile</p>
-        <p class="assistant-hint">Connected. Ask any specialist agent about your documents.</p>
 
-        <div class="chat-log">
-            {% if not messages %}
-                <p class="muted">No messages yet. Pick an agent and ask a question below.</p>
-            {% endif %}
-            {% for m in messages %}
-                {% if m.sender == 'user' %}
-                    <div class="bubble user">{{ m.content }}</div>
-                {% else %}
-                    <div class="bubble assistant-bubble">{{ m.content }}</div>
+        {% if not active %}
+            <div class="chat-log">
+                <p class="muted">Select a file on the left (or upload one) to start its conversation.</p>
+            </div>
+        {% else %}
+            <div class="chat-log">
+                {% if not messages %}
+                    <p class="muted">No questions yet for this file. Ask one below — it will be saved so you can revisit it later.</p>
                 {% endif %}
-            {% endfor %}
-        </div>
+                {% for m in messages %}
+                    {% if m.sender == 'user' %}
+                        <div class="bubble user">{{ m.content }}</div>
+                    {% else %}
+                        <div class="bubble assistant-bubble">{{ m.content }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
 
-        <form class="chat-form" method="post" action="/assistant/ask">
-            <label class="sr-label">Agent
-                <select name="agent_key">
-                    {% for key, a in agents.items() %}
-                        <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
-                            {{ a.icon }} {{ a.role }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label class="sr-label">Document (optional)
-                <select name="document_id">
-                    <option value="">— No document —</option>
-                    {% for doc in documents_flat %}
-                        <option value="{{ doc.id }}">{{ doc.title }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <textarea name="question" rows="3" placeholder="Ask about documents..." required></textarea>
-            <button type="submit" class="btn btn-block">Send to Assistant</button>
-        </form>
+            <form class="chat-form" method="post" action="/assistant/ask">
+                <input type="hidden" name="document_id" value="{{ active.id }}">
+                <label class="sr-label">Agent
+                    <select name="agent_key">
+                        {% for key, a in agents.items() %}
+                            <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
+                                {{ a.icon }} {{ a.role }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <textarea name="question" rows="3" placeholder="Ask about this file..." required></textarea>
+                <button type="submit" class="btn btn-block">Send to Assistant</button>
+            </form>
+        {% endif %}
     </aside>
 </div>
 <script src="/static/js/assistant.js"></script>

@@ -3,10 +3,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.ai_service import AGENTS, DEFAULT_AGENT, MODULES
+from app.ai_service import AGENTS, DEFAULT_AGENT
 from app.audit import log_event
 from app.auth import get_current_user
 from app.config import settings
@@ -22,16 +22,14 @@ def _require(user: User | None):
     return None if user else RedirectResponse(url="/login", status_code=303)
 
 
-def _docs_by_module(db: Session, user_id: int) -> dict[str, list[Document]]:
-    docs = db.scalars(
-        select(Document)
-        .where(Document.user_id == user_id)
-        .order_by(Document.created_at.desc())
-    ).all()
-    grouped: dict[str, list[Document]] = {key: [] for key in MODULES}
-    for d in docs:
-        grouped.setdefault(d.module, []).append(d)
-    return grouped
+def _user_documents(db: Session, user_id: int) -> list[Document]:
+    return list(
+        db.scalars(
+            select(Document)
+            .where(Document.user_id == user_id)
+            .order_by(Document.created_at.desc())
+        ).all()
+    )
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -42,12 +40,11 @@ def dashboard(
 ):
     if (r := _require(user)):
         return r
-    grouped = _docs_by_module(db, user.id)
-    total = sum(len(v) for v in grouped.values())
+    total = db.scalar(
+        select(func.count(Document.id)).where(Document.user_id == user.id)
+    ) or 0
     return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {"user": user, "grouped": grouped, "modules": MODULES, "total": total},
+        request, "dashboard.html", {"user": user, "total": total}
     )
 
 
@@ -55,39 +52,54 @@ def dashboard(
 def documents(
     request: Request,
     q: str = "",
+    doc: str = "",
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
     if (r := _require(user)):
         return r
-    grouped = _docs_by_module(db, user.id)
+
+    files = _user_documents(db, user.id)
+
     q = q.strip()
     if q:
         needle = q.lower()
-        grouped = {
-            key: [d for d in docs if needle in d.title.lower()
-                  or needle in (d.original_name or "").lower()]
-            for key, docs in grouped.items()
-        }
-    messages = db.scalars(
-        select(ChatMessage)
-        .where(ChatMessage.user_id == user.id)
-        .order_by(ChatMessage.created_at.asc())
-    ).all()
+        files = [
+            d for d in files
+            if needle in d.title.lower() or needle in (d.original_name or "").lower()
+        ]
+
+    # Resolve the active file (per-file conversation). Default to the newest.
+    active: Document | None = None
+    if doc.strip().isdigit():
+        candidate = db.get(Document, int(doc))
+        if candidate and candidate.user_id == user.id:
+            active = candidate
+    if active is None and files:
+        active = files[0]
+
+    messages = []
+    if active is not None:
+        messages = db.scalars(
+            select(ChatMessage)
+            .where(
+                ChatMessage.user_id == user.id,
+                ChatMessage.document_id == active.id,
+            )
+            .order_by(ChatMessage.created_at.asc())
+        ).all()
+
     return templates.TemplateResponse(
         request,
         "documents.html",
         {
             "user": user,
-            "grouped": grouped,
-            "modules": MODULES,
+            "files": files,
             "agents": AGENTS,
             "default_agent": DEFAULT_AGENT,
+            "active": active,
             "messages": messages,
-            "documents_flat": [d for docs in grouped.values() for d in docs],
             "q": q,
-            "assistant_width": user.assistant_width,
-            "assistant_height": user.assistant_height,
         },
     )
 
@@ -95,7 +107,6 @@ def documents(
 @router.post("/documents/upload")
 async def upload_document(
     request: Request,
-    module: str = Form(...),
     title: str = Form(""),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -103,8 +114,6 @@ async def upload_document(
 ):
     if (r := _require(user)):
         return r
-    if module not in MODULES:
-        module = next(iter(MODULES))
 
     data = await file.read()
     os.makedirs(settings.upload_dir, exist_ok=True)
@@ -116,7 +125,6 @@ async def upload_document(
     text = extract_text(data, file.filename or "", file.content_type or "")
     doc = Document(
         user_id=user.id,
-        module=module,
         title=(title.strip() or (file.filename or "Untitled document")),
         original_name=file.filename or "",
         stored_path=stored_path,
@@ -126,13 +134,14 @@ async def upload_document(
     )
     db.add(doc)
     db.commit()
+    db.refresh(doc)
     log_event(
         "document.upload",
         user=user.email,
-        module=module,
         title=doc.title,
         filename=doc.original_name,
         size_bytes=doc.size_bytes,
         extracted_chars=len(text),
     )
-    return RedirectResponse(url="/documents", status_code=303)
+    # Open the freshly uploaded file's conversation.
+    return RedirectResponse(url=f"/documents?doc={doc.id}", status_code=303)

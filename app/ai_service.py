@@ -21,15 +21,6 @@ import httpx
 
 from app.config import settings
 
-# Modules shown in the sidebar / used as document categories.
-MODULES: dict[str, str] = {
-    "alternative_finance": "Alternative Finance",
-    "specialty_lending": "Specialty Lending",
-    "acquisitions": "Acquisitions",
-    "legal_funding": "Legal Funding",
-    "portfolio_management": "Portfolio Management",
-}
-
 # Specialist agents (mirrors the CrewAI roster the local AI system runs).
 AGENTS: dict[str, dict[str, str]] = {
     "finance": {
