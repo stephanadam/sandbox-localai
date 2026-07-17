@@ -11,7 +11,8 @@ _uploads = tempfile.mkdtemp(prefix="acmeco_uploads_")
 _logs = tempfile.mkdtemp(prefix="acmeco_logs_")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp.name}"
 os.environ["SECRET_KEY"] = "test-secret"
-os.environ["AI_BACKEND"] = "mock"
+os.environ["LLM_TARGET"] = "mock"
+os.environ["CLOUD_API_KEY"] = ""
 os.environ["UPLOAD_DIR"] = _uploads
 os.environ["LOG_DIR"] = _logs
 
@@ -109,22 +110,93 @@ def test_nav_has_three_menus(client):
     assert 'href="/chat"' in page
 
 
-def test_documents_page_has_no_chat_form(client):
+def test_documents_page_has_edgar_form_no_chat(client):
     _register(client)
     _upload(client, "Plain Doc", content=b"revenue and yield content")
     page = client.get("/documents").text
     # The chat form lives on /chat, not on /documents.
     assert 'action="/assistant/ask"' not in page
     assert "Plain Doc" in page
+    # EDGAR import form is available here.
+    assert 'action="/documents/edgar"' in page
 
 
-def test_chat_page_has_agent_and_file_pickers(client):
+def test_chat_page_has_agent_file_and_llm_pickers(client):
     _register(client)
     _upload(client, "Chatable Doc", content=b"revenue and yield content")
     page = client.get("/chat").text
     assert 'name="agent_key"' in page
     assert 'name="document_id"' in page
+    assert 'name="llm_target"' in page  # local / cloud / mock connectivity
     assert "Chatable Doc" in page
+
+
+def test_llm_target_cloud_falls_back_to_mock(client):
+    _register(client)
+    doc_id = _upload(client, "Target Doc", content=b"revenue and risk content")
+    resp = client.post(
+        "/assistant/ask",
+        data={"question": "Assess the risks.", "agent_key": "finance",
+              "document_id": str(doc_id), "llm_target": "cloud"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    # No cloud key configured -> graceful fallback to offline mock with a note.
+    assert "cloud LLM unavailable" in resp.text
+
+
+def test_edgar_import_creates_edgar_document(client):
+    _register(client)
+    from unittest.mock import patch
+
+    fake = (
+        "AAPL 8-K (2026-04-30)",
+        "8K: Apple Inc. Current Report\nFINANCIALS: Revenue $111B",
+        "0000320193-26-000011",
+    )
+    with patch("app.routers.library.fetch_edgar_filing", return_value=fake):
+        resp = client.post(
+            "/documents/edgar",
+            data={"ticker": "AAPL", "form_type": "8-K"},
+            follow_redirects=False,
+        )
+    assert resp.status_code == 303
+    assert resp.headers["location"].startswith("/chat?doc=")
+
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models import Document
+
+    with SessionLocal() as db:
+        edoc = db.scalar(
+            select(Document).where(
+                Document.kind == "edgar", Document.title == "AAPL 8-K (2026-04-30)"
+            )
+        )
+    assert edoc is not None
+    # Shows in Documents (tagged SEC EDGAR) and is selectable in Chat.
+    assert "SEC EDGAR" in client.get("/documents").text
+    assert "AAPL 8-K" in client.get(f"/chat?doc={edoc.id}").text
+
+
+def test_edgar_import_error_redirects_with_message(client):
+    _register(client)
+    from unittest.mock import patch
+
+    from app.edgar_ingest import EdgarError
+
+    with patch(
+        "app.routers.library.fetch_edgar_filing",
+        side_effect=EdgarError("Could not find company for ticker 'ZZZZ'."),
+    ):
+        resp = client.post(
+            "/documents/edgar",
+            data={"ticker": "ZZZZ", "form_type": "10-Q"},
+            follow_redirects=False,
+        )
+    assert resp.status_code == 303
+    assert "edgar_error=" in resp.headers["location"]
 
 
 def test_ask_saves_response_as_analysis_document(client):

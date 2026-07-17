@@ -207,7 +207,9 @@ body.app { display: flex; min-height: 100vh; }
 }
 .file-del:hover { opacity: 1; background: rgba(248,113,113,0.15); }
 
-.chat-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.chat-selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; }
+.head-actions { display: flex; gap: 0.5rem; }
+.tag-edgar { background: rgba(96,165,250,0.16); color: #93c5fd; }
 
 /* ---------- Beginner starter prompts (chips) ---------- */
 .starter-prompts { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0.1rem 0 0.2rem; }

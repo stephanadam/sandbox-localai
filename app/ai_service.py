@@ -83,6 +83,20 @@ AGENTS: dict[str, dict[str, str]] = {
 
 DEFAULT_AGENT = "finance"
 
+# LLM connectivity targets the user can pick per request.
+LLM_TARGETS: dict[str, str] = {
+    "local": "Local (Ollama)",
+    "cloud": "Cloud API",
+    "mock": "Offline (mock)",
+}
+
+
+def target_or_default(target: str | None) -> str:
+    if target in LLM_TARGETS:
+        return target
+    return settings.llm_target if settings.llm_target in LLM_TARGETS else "mock"
+
+
 # Beginner-friendly starter prompts for the chat box (clickable suggestions).
 STARTER_PROMPTS: list[str] = [
     "Summarize this document in plain language.",
@@ -118,39 +132,38 @@ def ask_agent(
     question: str,
     context_text: str | None = None,
     document_title: str | None = None,
+    target: str | None = None,
 ) -> AgentReply:
     agent_key = agent_or_default(agent_key)
+    target = target_or_default(target)
 
-    if settings.ai_backend == "ollama":
+    if target == "local":
         try:
             return _ask_ollama(agent_key, question, context_text)
         except Exception as exc:  # noqa: BLE001
-            return _degrade(
-                agent_key, question, context_text, document_title, "ollama", exc
-            )
-    if settings.ai_backend == "anythingllm":
+            return _degrade(agent_key, question, context_text, document_title, "local", exc)
+    if target == "cloud":
         try:
-            return _ask_anythingllm(agent_key, question, context_text)
+            return _ask_cloud(agent_key, question, context_text)
         except Exception as exc:  # noqa: BLE001
-            return _degrade(
-                agent_key, question, context_text, document_title, "anythingllm", exc
-            )
+            return _degrade(agent_key, question, context_text, document_title, "cloud", exc)
 
     return _ask_mock(agent_key, question, context_text, document_title)
 
 
 def _degrade(
-    agent_key, question, context_text, document_title, backend, exc
+    agent_key, question, context_text, document_title, target, exc
 ) -> AgentReply:
     reply = _ask_mock(agent_key, question, context_text, document_title)
     reply.text = (
-        f"[{backend} backend unavailable: {exc}. Showing offline agent "
-        f"response instead.]\n\n{reply.text}"
+        f"[{target} LLM unavailable: {exc}. Showing offline agent response "
+        f"instead — check your {target} configuration.]\n\n{reply.text}"
     )
     return reply
 
 
 def _ask_ollama(agent_key, question, context_text) -> AgentReply:
+    """Local, private inference via an Ollama server."""
     prompt = question
     if context_text:
         prompt = f"Using this document as context:\n\n{context_text}\n\n{question}"
@@ -162,34 +175,42 @@ def _ask_ollama(agent_key, question, context_text) -> AgentReply:
             "prompt": prompt,
             "stream": False,
         },
-        timeout=120,
+        timeout=180,
     )
     response.raise_for_status()
     return AgentReply(
         text=response.json().get("response", "").strip(),
-        backend="ollama",
+        backend="local",
         agent_key=agent_key,
     )
 
 
-def _ask_anythingllm(agent_key, question, context_text) -> AgentReply:
-    message = f"[As {AGENTS[agent_key]['role']}] {question}"
+def _ask_cloud(agent_key, question, context_text) -> AgentReply:
+    """Cloud inference via an OpenAI-compatible Chat Completions API."""
+    if not settings.cloud_api_key:
+        raise RuntimeError("CLOUD_API_KEY is not set")
+    user_content = question
     if context_text:
-        message += f"\n\nDocument context:\n{context_text}"
-    headers = {"Content-Type": "application/json"}
-    if settings.anythingllm_api_key:
-        headers["Authorization"] = f"Bearer {settings.anythingllm_api_key}"
-    url = (
-        f"{settings.anythingllm_url}/api/v1/workspace/"
-        f"{settings.anythingllm_workspace}/chat"
-    )
+        user_content = f"Using this document as context:\n\n{context_text}\n\n{question}"
     response = httpx.post(
-        url, json={"message": message, "mode": "query"}, headers=headers, timeout=120
+        f"{settings.cloud_base_url.rstrip('/')}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {settings.cloud_api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": settings.cloud_model,
+            "messages": [
+                {"role": "system", "content": _system_prompt(agent_key)},
+                {"role": "user", "content": user_content},
+            ],
+        },
+        timeout=180,
     )
     response.raise_for_status()
     data = response.json()
-    text = data.get("textResponse") or data.get("response") or str(data)
-    return AgentReply(text=text.strip(), backend="anythingllm", agent_key=agent_key)
+    text = data["choices"][0]["message"]["content"].strip()
+    return AgentReply(text=text, backend="cloud", agent_key=agent_key)
 
 
 def _ask_mock(agent_key, question, context_text, document_title=None) -> AgentReply:

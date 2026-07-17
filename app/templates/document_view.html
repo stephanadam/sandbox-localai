@@ -7,6 +7,7 @@
 </div>
 <p class="muted">
     {% if doc.kind == 'analysis' %}<span class="tag tag-analysis">Analysis</span>
+    {% elif doc.kind == 'edgar' %}<span class="tag tag-edgar">SEC EDGAR</span>
     {% else %}<span class="tag">Upload</span>{% endif %}
     &middot; {{ doc.original_name }}
     &middot; {{ (doc.size_bytes / 1024)|round(1) }} KB

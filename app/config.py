@@ -15,23 +15,28 @@ class Settings(BaseSettings):
     # Directory for the rotating audit log of transactions & AI responses.
     log_dir: str = "./logs"
 
-    # AI backend: "mock" (offline, agent-aware heuristic), "ollama", or
-    # "anythingllm" (RAG assistant). All fall back to mock on error.
-    ai_backend: str = "mock"
+    # ----- LLM connectivity -----
+    # Default target when a request doesn't specify one. One of:
+    #   "local" -> a local Ollama server (private, on your machine)
+    #   "cloud" -> an OpenAI-compatible Cloud API
+    #   "mock"  -> offline heuristic (no service needed; safe default)
+    llm_target: str = "mock"
 
+    # Local (Ollama)
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
 
-    anythingllm_url: str = "http://localhost:3001"
-    anythingllm_api_key: str = ""
-    anythingllm_workspace: str = "acmeco"
+    # Cloud API (OpenAI-compatible: OpenAI, Together, Groq, vLLM, etc.)
+    cloud_api_key: str = ""
+    cloud_base_url: str = "https://api.openai.com/v1"
+    cloud_model: str = "gpt-4o-mini"
 
-    # Optional OpenSearch cluster powering document search (status only for now).
-    opensearch_url: str = ""
-    opensearch_cluster: str = "acmeco-os"
+    # ----- SEC EDGAR -----
+    # SEC requires a contact string in the User-Agent. Set to your name + email.
+    edgar_identity: str = "AcmeCO Research research@example.com"
 
     app_name: str = "AcmeCO"
-    app_tagline: str = "OpenSearch • AnythingLLM"
+    app_tagline: str = "SEC EDGAR • Local + Cloud AI"
 
 
 settings = Settings()

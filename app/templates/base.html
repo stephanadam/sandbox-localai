@@ -34,8 +34,8 @@
         <div class="cluster-status">
             <span class="dot"></span>
             <div>
-                <strong>Connected · {{ doc_count(user.id) }} documents</strong>
-                <small>Cluster: {{ cluster_name }} · Last sync: just now</small>
+                <strong>{{ doc_count(user.id) }} documents</strong>
+                <small>LLM: {{ llm_default_label }} · SEC EDGAR ready</small>
             </div>
         </div>
     </aside>

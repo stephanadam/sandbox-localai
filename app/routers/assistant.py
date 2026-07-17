@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 from app.ai_service import (
     AGENTS,
     DEFAULT_AGENT,
+    LLM_TARGETS,
     STARTER_PROMPTS,
     agent_or_default,
     ask_agent,
+    target_or_default,
 )
 from app.audit import log_event
 from app.auth import get_current_user
@@ -44,11 +46,14 @@ def _resolve_context(db: Session, doc: Document) -> str:
     return ""
 
 
-def _upload_documents(db: Session, user_id: int) -> list[Document]:
+_SOURCE_KINDS = ("upload", "edgar")
+
+
+def _source_documents(db: Session, user_id: int) -> list[Document]:
     return list(
         db.scalars(
             select(Document)
-            .where(Document.user_id == user_id, Document.kind == "upload")
+            .where(Document.user_id == user_id, Document.kind.in_(_SOURCE_KINDS))
             .order_by(Document.created_at.desc())
         ).all()
     )
@@ -64,12 +69,12 @@ def chat_page(
     if user is None:
         return RedirectResponse(url="/login", status_code=303)
 
-    files = _upload_documents(db, user.id)
+    files = _source_documents(db, user.id)
 
     active: Document | None = None
     if doc.strip().isdigit():
         candidate = db.get(Document, int(doc))
-        if candidate and candidate.user_id == user.id and candidate.kind == "upload":
+        if candidate and candidate.user_id == user.id and candidate.kind in _SOURCE_KINDS:
             active = candidate
     if active is None and files:
         active = files[0]
@@ -96,6 +101,8 @@ def chat_page(
             "active": active,
             "messages": messages,
             "starter_prompts": STARTER_PROMPTS,
+            "llm_targets": LLM_TARGETS,
+            "default_target": target_or_default(None),
         },
     )
 
@@ -150,6 +157,7 @@ def ask(
     question: str = Form(...),
     agent_key: str = Form("finance"),
     document_id: str = Form(""),
+    llm_target: str = Form(""),
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
@@ -161,12 +169,13 @@ def ask(
         return RedirectResponse(url="/chat", status_code=303)
 
     agent_key = agent_or_default(agent_key)
+    target = target_or_default(llm_target)
 
-    # Conversations are scoped to a single upload file; a valid file is required.
+    # Conversations are scoped to a single source file; a valid file is required.
     doc: Document | None = None
     if document_id.strip().isdigit():
         candidate = db.get(Document, int(document_id))
-        if candidate and candidate.user_id == user.id and candidate.kind == "upload":
+        if candidate and candidate.user_id == user.id and candidate.kind in _SOURCE_KINDS:
             doc = candidate
     if doc is None:
         log_event(
@@ -195,10 +204,11 @@ def ask(
         document=doc.title,
         document_id=doc.id,
         context_chars=(len(context) if context else 0),
+        target=target,
         question=question,
     )
 
-    reply = ask_agent(agent_key, question, context, document_title=doc.title)
+    reply = ask_agent(agent_key, question, context, document_title=doc.title, target=target)
 
     db.add(
         ChatMessage(

@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.ai_service import LLM_TARGETS
 from app.auth import get_current_user
 from app.config import settings
 from app.database import SessionLocal, init_db
@@ -21,7 +22,7 @@ async def lifespan(app: FastAPI):
     init_db()
     from app.audit import log_event
 
-    log_event("app.startup", app=settings.app_name, ai_backend=settings.ai_backend)
+    log_event("app.startup", app=settings.app_name, llm_target=settings.llm_target)
     yield
 
 
@@ -37,8 +38,9 @@ app.include_router(assistant_router.router)
 
 # Expose app-wide bits to every template.
 templates.env.globals["app_tagline"] = settings.app_tagline
-templates.env.globals["ai_backend"] = settings.ai_backend
-templates.env.globals["cluster_name"] = settings.opensearch_cluster
+templates.env.globals["llm_default_label"] = LLM_TARGETS.get(
+    settings.llm_target, settings.llm_target
+)
 
 
 def _doc_count(user_id: int) -> int:
@@ -60,4 +62,4 @@ def index(user: User | None = Depends(get_current_user)):
 
 @app.get("/healthz")
 def healthz():
-    return {"status": "ok", "app": settings.app_name, "ai_backend": settings.ai_backend}
+    return {"status": "ok", "app": settings.app_name, "llm_target": settings.llm_target}

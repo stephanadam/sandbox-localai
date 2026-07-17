@@ -30,7 +30,7 @@
                     <div class="active-file">Conversation for: {{ active.title }}</div>
                 {% endif %}
             </div>
-            <span class="badge-backend">{{ ai_backend }}</span>
+            <span class="badge-backend">{{ llm_default_label }}</span>
         </div>
 
         {% if not files %}
@@ -67,6 +67,15 @@
                             {% for doc in files %}
                                 <option value="{{ doc.id }}" {% if active and doc.id == active.id %}selected{% endif %}>
                                     {{ doc.title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="sr-label">LLM connectivity
+                        <select name="llm_target">
+                            {% for key, label in llm_targets.items() %}
+                                <option value="{{ key }}" {% if key == default_target %}selected{% endif %}>
+                                    {{ label }}
                                 </option>
                             {% endfor %}
                         </select>

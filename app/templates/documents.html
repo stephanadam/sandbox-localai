@@ -4,9 +4,34 @@
 <div class="documents-page">
     <div class="library-head">
         <h2 class="section-title">Documents</h2>
-        <button class="btn" onclick="document.getElementById('upload').classList.toggle('open')">
-            + Upload document
-        </button>
+        <div class="head-actions">
+            <button class="btn" onclick="document.getElementById('edgar').classList.toggle('open')">
+                Import from SEC EDGAR
+            </button>
+            <button class="btn" onclick="document.getElementById('upload').classList.toggle('open')">
+                + Upload document
+            </button>
+        </div>
+    </div>
+
+    {% if edgar_error %}<p class="error">{{ edgar_error }}</p>{% endif %}
+
+    <div id="edgar" class="card upload-card {% if edgar_error %}open{% endif %}">
+        <form method="post" action="/documents/edgar">
+            <div class="upload-row">
+                <label>Ticker
+                    <input type="text" name="ticker" placeholder="e.g. AAPL" required>
+                </label>
+                <label>Filing type
+                    <select name="form_type">
+                        {% for f in edgar_forms %}
+                            <option value="{{ f }}" {% if f == '10-Q' %}selected{% endif %}>{{ f }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-block">Fetch latest filing (XBRL + MD&amp;A + Risk Factors)</button>
+        </form>
     </div>
 
     <div id="upload" class="card upload-card">
@@ -35,6 +60,8 @@
                 <td>
                     {% if doc.kind == 'analysis' %}
                         <span class="tag tag-analysis">Analysis</span>
+                    {% elif doc.kind == 'edgar' %}
+                        <span class="tag tag-edgar">SEC EDGAR</span>
                     {% else %}
                         <span class="tag">Upload</span>
                     {% endif %}
