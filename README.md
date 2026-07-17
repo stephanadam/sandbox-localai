@@ -1,5 +1,85 @@
-# sandbox-localai
+# sandbox-localai — AcmeCO
 
-Initial repository content.
+A **local-only** web front end for financial/legal analyst workflows, designed to
+run on a local server and act as the UI layer for a larger local AI system.
 
-Created by GitHub Copilot on behalf of @stephanadam.
+## Features
+
+- **Sign-in / registration** with session cookies and `bcrypt`-hashed passwords.
+- **Local SQLite database** (via SQLAlchemy) — zero-config, file-based, ideal for
+  a self-hosted local server. Swap `DATABASE_URL` for PostgreSQL to scale later.
+- **Three menus**: Dashboard (stats + agent specialties), Documents (upload / view
+  / delete + saved analyses), and Chat (agent + file-to-process + chat box).
+- **SEC EDGAR ingestion** (`edgartools`): enter a ticker + filing type (10-K /
+  10-Q / 8-K) and pull structured context — XBRL financial statements + MD&A +
+  Risk Factors — instead of uploading a PDF.
+- **Document upload** (TXT/PDF/DOCX/XLSX) with text extraction used as RAG context.
+- **Per-file assistant conversations**: each file keeps its own saved Q&A history;
+  every AI response is also saved as a text-file "analysis" document.
+- **Seven specialist agents** (finance, capital markets, underwriting & risk,
+  legal, accounting, marketing, data analytics), shown with their capabilities.
+- **Switchable LLM connectivity** (`app/ai_service.py`), chosen per request:
+  - **Local (Ollama)** — private, on your machine (`OLLAMA_URL`/`OLLAMA_MODEL`).
+  - **Cloud API** — any OpenAI-compatible endpoint (`CLOUD_API_KEY`/`CLOUD_BASE_URL`/`CLOUD_MODEL`).
+  - **Offline (mock)** — agent-aware heuristic, the safe default; `local`/`cloud`
+    fall back to it on any error.
+- **Audit log** of all transactions and AI responses in `logs/acmeco.log`.
+
+## Tech stack
+
+- **Python 3.12** + **FastAPI** (recommended: shares the runtime with the local
+  AI stack, so integration is in-process).
+- **Jinja2** server-rendered templates + a little CSS (no JS build step).
+- **SQLite** + **SQLAlchemy 2.x**.
+
+## Local development
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+> **Already have a separate environment for your local AI stack** (e.g. Chainlit,
+> CrewAI, LangChain)? Don't install this app into it — the pinned web deps can
+> downgrade packages that stack needs. Use a dedicated venv instead:
+>
+> ```bash
+> python3 -m venv .venv-legal
+> source .venv-legal/bin/activate
+> pip install -r requirements.txt
+> ```
+
+Optionally customize settings, then run the dev server:
+
+```bash
+# Optional: customize settings
+cp .env.example .env
+
+# Run the dev server (auto-reload). Easiest: works from any directory.
+python run.py
+
+# ...or run uvicorn directly (must be from the repo root, with the venv active):
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Then open http://localhost:8000, register an account, and run an analysis.
+
+> If you see `Error loading ASGI app. Attribute "app" not found in module
+> "app.main"`, uvicorn was started from the wrong directory or without the
+> virtualenv active. Use `python run.py` (which pins the working directory), or
+> `cd` to the repo root and activate `.venv` before running `uvicorn`.
+
+Override host/port/reload for `run.py` via env vars, e.g. `PORT=9000 RELOAD=0 python run.py`.
+
+### Tests
+
+```bash
+pytest -q
+```
+
+## Wiring in the real local AI system
+
+Set `AI_BACKEND=ollama` (and `OLLAMA_URL` / `OLLAMA_MODEL`) in `.env`, or extend
+`app/ai_service.analyze()` with another local backend (llama.cpp, vLLM, a custom
+service). The rest of the app only depends on the `AnalysisResult` it returns.

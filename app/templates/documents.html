@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<div class="documents-page">
+    <div class="library-head">
+        <h2 class="section-title">Documents</h2>
+        <div class="head-actions">
+            <button class="btn" onclick="document.getElementById('edgar').classList.toggle('open')">
+                Import from SEC EDGAR
+            </button>
+            <button class="btn" onclick="document.getElementById('upload').classList.toggle('open')">
+                + Upload document
+            </button>
+        </div>
+    </div>
+
+    {% if edgar_error %}<p class="error">{{ edgar_error }}</p>{% endif %}
+
+    <div id="edgar" class="card upload-card {% if edgar_error %}open{% endif %}">
+        <form method="post" action="/documents/edgar">
+            <div class="upload-row">
+                <label>Ticker
+                    <input type="text" name="ticker" placeholder="e.g. AAPL" required>
+                </label>
+                <label>Filing type
+                    <select name="form_type">
+                        {% for f in edgar_forms %}
+                            <option value="{{ f }}" {% if f == '10-Q' %}selected{% endif %}>{{ f }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-block">Fetch latest filing (XBRL + MD&amp;A + Risk Factors)</button>
+        </form>
+    </div>
+
+    <div id="upload" class="card upload-card">
+        <form method="post" action="/documents/upload" enctype="multipart/form-data">
+            <label>Title (optional)
+                <input type="text" name="title" placeholder="Defaults to file name">
+            </label>
+            <label>File (TXT, PDF, DOCX, XLSX)
+                <input type="file" name="file" required>
+            </label>
+            <button type="submit" class="btn btn-block">Upload &amp; index</button>
+        </form>
+    </div>
+
+    {% if not files %}
+        <div class="card"><p class="muted">No documents yet. Upload one to get started.</p></div>
+    {% else %}
+    <table class="table doc-table">
+        <thead>
+            <tr><th>Title</th><th>Type</th><th>Size</th><th>Added</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for doc in files %}
+            <tr>
+                <td><a class="doc-link" href="/documents/{{ doc.id }}">📄 {{ doc.title }}</a></td>
+                <td>
+                    {% if doc.kind == 'analysis' %}
+                        <span class="tag tag-analysis">Analysis</span>
+                    {% elif doc.kind == 'edgar' %}
+                        <span class="tag tag-edgar">SEC EDGAR</span>
+                    {% else %}
+                        <span class="tag">Upload</span>
+                    {% endif %}
+                </td>
+                <td>{{ (doc.size_bytes / 1024)|round(1) }} KB</td>
+                <td>{{ doc.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                <td class="row-actions">
+                    <a class="btn-link" href="/documents/{{ doc.id }}">View</a>
+                    <form method="post" action="/documents/{{ doc.id }}/delete"
+                          onsubmit="return confirm('Delete “{{ doc.title }}”?');">
+                        <button type="submit" class="file-del" title="Remove">🗑</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endblock %}

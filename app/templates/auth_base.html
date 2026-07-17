@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth">
+    <div class="auth-wrap">
+        <div class="brand brand-lg">
+            <span class="brand-badge">AC</span>
+            <span class="brand-text">
+                <strong>{{ app_name }}</strong>
+                <small>{{ app_tagline }}</small>
+            </span>
+        </div>
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

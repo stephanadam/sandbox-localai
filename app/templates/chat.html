@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Chat{% endblock %}
+{% block content %}
+<div class="workspace">
+    <section class="files-col">
+        <h2 class="section-title">Files to process</h2>
+        <div class="file-list">
+            {% if not files %}
+                <p class="muted empty-note">
+                    No files yet. Add one in <a href="/documents">Documents</a> first.
+                </p>
+            {% endif %}
+            {% for doc in files %}
+            <a class="file-item {% if active and doc.id == active.id %}selected{% endif %}"
+               href="/chat?doc={{ doc.id }}#assistant">
+                <span class="file-open">
+                    <span class="doc-icon">📄</span>
+                    <span class="doc-meta"><strong>{{ doc.title }}</strong></span>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <aside class="assistant" id="assistant">
+        <div class="assistant-head">
+            <div>
+                <strong>Assistant (RAG)</strong>
+                {% if active %}
+                    <div class="active-file">Conversation for: {{ active.title }}</div>
+                {% endif %}
+            </div>
+            <span class="badge-backend">{{ llm_default_label }}</span>
+        </div>
+
+        {% if not files %}
+            <div class="chat-log">
+                <p class="muted">Upload a file in Documents, then come back to chat about it.</p>
+            </div>
+        {% else %}
+            <div class="chat-log">
+                {% if not messages %}
+                    <p class="muted">No questions yet for this file. Ask one below — the response is also saved to Documents as an analyzed file.</p>
+                {% endif %}
+                {% for m in messages %}
+                    {% if m.sender == 'user' %}
+                        <div class="bubble user">{{ m.content }}</div>
+                    {% else %}
+                        <div class="bubble assistant-bubble">{{ m.content }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <form class="chat-form" method="post" action="/assistant/ask">
+                <div class="chat-selects">
+                    <label class="sr-label">AI agent
+                        <select name="agent_key">
+                            {% for key, a in agents.items() %}
+                                <option value="{{ key }}" {% if key == default_agent %}selected{% endif %}>
+                                    {{ a.icon }} {{ a.role }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="sr-label">File to process
+                        <select name="document_id">
+                            {% for doc in files %}
+                                <option value="{{ doc.id }}" {% if active and doc.id == active.id %}selected{% endif %}>
+                                    {{ doc.title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="sr-label">LLM connectivity
+                        <select name="llm_target">
+                            {% for key, label in llm_targets.items() %}
+                                <option value="{{ key }}" {% if key == default_target %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <textarea id="question-box" name="question" rows="3" placeholder="Task the AI about the selected file..." required></textarea>
+                <div class="starter-prompts">
+                    <span class="starter-label">Try:</span>
+                    {% for p in starter_prompts %}
+                        <button type="button" class="chip" data-prompt="{{ p }}">{{ p }}</button>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-block">Send to Assistant</button>
+            </form>
+        {% endif %}
+    </aside>
+</div>
+<script src="/static/js/assistant.js"></script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="stats-row">
+    <div class="stat-card">
+        <span class="stat-num">{{ uploaded }}</span>
+        <span class="stat-label">Files uploaded</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">7</span>
+        <span class="stat-label">AI agents</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">{{ analyzed }}</span>
+        <span class="stat-label">Files analyzed</span>
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="section-title">Welcome, {{ user.full_name or user.email }}</h2>
+    <p class="muted">
+        Upload files in <strong>Documents</strong>, then task an agent in
+        <strong>Chat</strong>. Every AI response is saved as a text file and
+        appears back in Documents as an analyzed document.
+    </p>
+    <div class="cta-row">
+        <a href="/documents" class="btn">Documents</a>
+        <a href="/chat" class="btn">Chat</a>
+    </div>
+</div>
+
+<h2 class="section-title">AI agents &amp; specialties</h2>
+<p class="muted agents-intro">Pick the agent whose specialty best matches your task in the Chat menu.</p>
+<div class="grid">
+    {% for key, a in agents.items() %}
+    <div class="agent-card">
+        <div class="agent-head">
+            <span class="agent-icon">{{ a.icon }}</span>
+            <div>
+                <strong>{{ a.role }}</strong>
+                <div class="agent-goal">{{ a.goal }}</div>
+            </div>
+        </div>
+        <p class="agent-caps"><span class="caps-label">Capable of:</span> {{ a.capabilities }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
