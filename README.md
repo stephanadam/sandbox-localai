@@ -8,18 +8,22 @@ run on a local server and act as the UI layer for a larger local AI system.
 - **Sign-in / registration** with session cookies and `bcrypt`-hashed passwords.
 - **Local SQLite database** (via SQLAlchemy) — zero-config, file-based, ideal for
   a self-hosted local server. Swap `DATABASE_URL` for PostgreSQL to scale later.
-- **Single-folder document library**: upload text files (TXT/PDF/DOCX/XLSX); their
-  text is extracted and used as RAG context. Each user sees only their own files.
-- **Per-file assistant conversations**: select a file and chat with a specialist
-  agent about it. Each file keeps its **own saved question/response history** so
-  you can revisit it later. The chat is a fixed, large panel.
+- **Three menus**: Dashboard (stats + agent specialties), Documents (upload / view
+  / delete + saved analyses), and Chat (agent + file-to-process + chat box).
+- **SEC EDGAR ingestion** (`edgartools`): enter a ticker + filing type (10-K /
+  10-Q / 8-K) and pull structured context — XBRL financial statements + MD&A +
+  Risk Factors — instead of uploading a PDF.
+- **Document upload** (TXT/PDF/DOCX/XLSX) with text extraction used as RAG context.
+- **Per-file assistant conversations**: each file keeps its own saved Q&A history;
+  every AI response is also saved as a text-file "analysis" document.
 - **Seven specialist agents** (finance, capital markets, underwriting & risk,
-  legal, accounting, marketing, data analytics).
+  legal, accounting, marketing, data analytics), shown with their capabilities.
+- **Switchable LLM connectivity** (`app/ai_service.py`), chosen per request:
+  - **Local (Ollama)** — private, on your machine (`OLLAMA_URL`/`OLLAMA_MODEL`).
+  - **Cloud API** — any OpenAI-compatible endpoint (`CLOUD_API_KEY`/`CLOUD_BASE_URL`/`CLOUD_MODEL`).
+  - **Offline (mock)** — agent-aware heuristic, the safe default; `local`/`cloud`
+    fall back to it on any error.
 - **Audit log** of all transactions and AI responses in `logs/acmeco.log`.
-- **Pluggable AI backend** (`app/ai_service.py`):
-  - `mock` (default) — fully offline, agent-aware heuristic, no external service.
-  - `ollama` / `anythingllm` — call a local LLM / RAG service (the "bigger local
-    AI system"), falling back to `mock` if unavailable.
 
 ## Tech stack
 

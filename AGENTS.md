@@ -14,11 +14,16 @@ a "file to process", ask). Core pieces: sign-in, text extraction
 (`ChatMessage.document_id`), viewable at `/chat?doc=<id>`. See `README.md` for
 run/test commands.
 
-- **Analysis files:** every AI chat response is also written to a `.txt` file in
-  `UPLOAD_DIR` and recorded as a `Document` with `kind="analysis"`, so it shows
-  up in Documents (tagged "Analysis") and can be reopened later. Uploads have
-  `kind="upload"`. The `kind` column is added to older SQLite DBs by the additive
-  migration in `database.py` `_migrate_sqlite()`.
+- **Document kinds:** `Document.kind` is `upload` (user file), `edgar` (imported
+  SEC filing), or `analysis` (saved AI response). Source docs for chat = upload +
+  edgar. Every AI response is also written to a `.txt` in `UPLOAD_DIR` and saved
+  as an `analysis` document (tagged "Analysis"), reopenable later. The `kind`
+  column is added to older SQLite DBs by `database.py` `_migrate_sqlite()`.
+- **SEC EDGAR ingestion:** `app/edgar_ingest.py` (via `edgartools`) fetches a
+  ticker's latest 10-K/10-Q/8-K and builds structured context (XBRL statements +
+  MD&A + Risk Factors) — far better than a PDF dump. Requires outbound network to
+  `sec.gov`/`data.sec.gov` and a contact string in `EDGAR_IDENTITY`. Import via
+  the "Import from SEC EDGAR" form on `/documents`.
 
 ## Cursor Cloud specific instructions
 
@@ -37,15 +42,16 @@ run/test commands.
   startup (FastAPI lifespan → `init_db()`), so there is no separate migration
   step. The DB file (`legal_analyst.db`) is git-ignored and created on first run.
 - **Tests:** `pytest -q`. The suite forces `DATABASE_URL` to a throwaway temp
-  SQLite file and `AI_BACKEND=mock` via env vars set at import time in
-  `tests/test_app.py`, so it never touches the dev database.
-- **AI backend:** `ask_agent()` in `app/ai_service.py` is the only integration
-  point with the "bigger local AI system". Defaults to `AI_BACKEND=mock` (fully
-  offline, agent-aware heuristic), so the app runs end-to-end with no external
-  service. Set `AI_BACKEND=ollama` (+ `OLLAMA_URL`/`OLLAMA_MODEL`) or
-  `AI_BACKEND=anythingllm` (+ `ANYTHINGLLM_URL`/`ANYTHINGLLM_API_KEY`/
-  `ANYTHINGLLM_WORKSPACE`) to use a real LLM; both **fall back to `mock`** on any
-  error, so a missing/broken AI service never breaks the UI.
+  SQLite file and `LLM_TARGET=mock` via env vars set at import time in
+  `tests/test_app.py`, so it never touches the dev database or a real LLM. EDGAR
+  is exercised with `fetch_edgar_filing` mocked (no live network in tests).
+- **LLM connectivity:** `ask_agent()` in `app/ai_service.py` is the only LLM
+  integration point and supports a per-request `target`: `local` (Ollama, via
+  `OLLAMA_URL`/`OLLAMA_MODEL`), `cloud` (OpenAI-compatible Chat Completions via
+  `CLOUD_API_KEY`/`CLOUD_BASE_URL`/`CLOUD_MODEL`), or `mock` (offline heuristic,
+  the safe default `LLM_TARGET`). Users pick it in the chat "LLM connectivity"
+  dropdown. Both `local` and `cloud` **fall back to `mock`** on any error, so a
+  missing server/key never breaks the UI.
 - **Audit log:** all auth events, uploads, and every assistant question/response
   are written to `<LOG_DIR>/acmeco.log` (default `./logs/`, git-ignored, rotating)
   via `app/audit.py` `log_event()`; it also mirrors to stdout. `LOG_DIR` is
